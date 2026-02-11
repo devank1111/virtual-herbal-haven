@@ -1,7 +1,8 @@
 import { Link, useLocation } from "react-router-dom";
-import { Leaf, Menu, X } from "lucide-react";
+import { Leaf, Menu, X, LogOut } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAuth } from "@/hooks/useAuth";
 
 const navItems = [
   { label: "Home", path: "/" },
@@ -12,6 +13,7 @@ const navItems = [
 export default function Header() {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { user, signOut } = useAuth();
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
@@ -41,6 +43,15 @@ export default function Header() {
               {item.label}
             </Link>
           ))}
+          {user && (
+            <button
+              onClick={() => signOut()}
+              className="px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex items-center gap-1.5"
+            >
+              <LogOut className="w-4 h-4" />
+              Logout
+            </button>
+          )}
         </nav>
 
         {/* Mobile toggle */}
