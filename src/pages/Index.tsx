@@ -1,5 +1,6 @@
 import HeroSection from "@/components/HeroSection";
 import FeaturedPlants from "@/components/FeaturedPlants";
+import IndiaMap from "@/components/IndiaMap";
 import AboutSection from "@/components/AboutSection";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -10,6 +11,7 @@ const Index = () => {
       <Header />
       <main>
         <HeroSection />
+        <IndiaMap />
         <FeaturedPlants />
         <AboutSection />
       </main>
