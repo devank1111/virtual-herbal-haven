@@ -7,6 +7,10 @@ import {
   Pill,
   Scissors,
   Sparkles,
+  Globe,
+  User,
+  FileText,
+  ExternalLink,
 } from "lucide-react";
 import type { Plant } from "@/data/plants";
 
@@ -17,7 +21,9 @@ interface PlantDetailSectionsProps {
 export default function PlantDetailSections({ plant }: PlantDetailSectionsProps) {
   const sections = [
     { icon: Leaf, title: "Description", content: plant.description },
+    { icon: Globe, title: "Native Location", content: plant.nativeLocation },
     { icon: MapPin, title: "Habitat & Growing Conditions", content: plant.habitat },
+    { icon: User, title: "Key Researcher", content: plant.researcher },
     { icon: Pill, title: "Medicinal Uses", content: null, list: plant.medicinalUses },
     { icon: Scissors, title: "Parts Used", content: plant.partsUsed.join(" • ") },
     { icon: Sparkles, title: "Preparation Methods", content: plant.preparation },
@@ -65,6 +71,46 @@ export default function PlantDetailSections({ plant }: PlantDetailSectionsProps)
           )}
         </motion.div>
       ))}
+
+      {/* References Section */}
+      {plant.references && plant.references.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5, delay: sections.length * 0.05 }}
+          className="p-6 rounded-xl bg-card shadow-botanical botanical-border"
+        >
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <FileText className="w-5 h-5 text-primary" />
+            </div>
+            <h2 className="font-display text-xl font-bold text-foreground">
+              Research References
+            </h2>
+          </div>
+          <ul className="space-y-4 pl-12">
+            {plant.references.map((ref, j) => (
+              <li key={j} className="text-muted-foreground">
+                <p className="font-medium text-foreground text-sm leading-snug">
+                  {ref.title}
+                </p>
+                <p className="text-xs mt-1">
+                  {ref.authors} — <span className="italic">{ref.journal}</span> ({ref.year})
+                </p>
+                <a
+                  href={ref.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs text-primary hover:text-accent mt-1 font-medium transition-colors"
+                >
+                  View Paper <ExternalLink className="w-3 h-3" />
+                </a>
+              </li>
+            ))}
+          </ul>
+        </motion.div>
+      )}
     </div>
   );
 }
