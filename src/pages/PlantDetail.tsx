@@ -6,7 +6,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import PlantDetailHero from "@/components/PlantDetailHero";
 import PlantDetailSections from "@/components/PlantDetailSections";
-import PlantModelViewer from "@/components/PlantModelViewer";
+import PlantVideos from "@/components/PlantVideos";
 
 export default function PlantDetail() {
   const { id } = useParams<{ id: string }>();
@@ -85,7 +85,7 @@ export default function PlantDetail() {
               transition={{ delay: 0.4, duration: 0.6 }}
               className="lg:sticky lg:top-28"
             >
-              <PlantModelViewer plantId={plant.id} plantName={plant.name} />
+              <PlantVideos plantId={plant.id} plantName={plant.name} />
             </motion.div>
           </div>
         </div>
