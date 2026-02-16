@@ -1,5 +1,6 @@
-import { motion } from "framer-motion";
-import { Play } from "lucide-react";
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Play, ChevronLeft, ChevronRight } from "lucide-react";
 
 const plantVideos: Record<string, { title: string; videoId: string }[]> = {
   tulsi: [
@@ -74,36 +75,87 @@ export default function PlantVideos({ plantId, plantName }: PlantVideosProps) {
     { title: `Learn about ${plantName}`, videoId: "dQw4w9WgXcQ" },
   ];
 
+  const [current, setCurrent] = useState(0);
+
+  // Auto-rotate every 8 seconds
+  useEffect(() => {
+    if (videos.length <= 1) return;
+    const timer = setInterval(() => {
+      setCurrent((prev) => (prev + 1) % videos.length);
+    }, 8000);
+    return () => clearInterval(timer);
+  }, [videos.length]);
+
+  const prev = () => setCurrent((c) => (c - 1 + videos.length) % videos.length);
+  const next = () => setCurrent((c) => (c + 1) % videos.length);
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="flex items-center gap-2 mb-2">
         <Play className="w-5 h-5 text-primary" />
         <h3 className="font-display text-lg font-bold text-foreground">Related Videos</h3>
       </div>
 
-      {videos.map((video, i) => (
-        <motion.div
-          key={video.videoId}
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 + i * 0.15 }}
-          className="rounded-xl overflow-hidden bg-card shadow-botanical botanical-border"
-        >
-          <div className="aspect-video">
-            <iframe
-              src={`https://www.youtube.com/embed/${video.videoId}`}
-              title={video.title}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              className="w-full h-full"
-              loading="lazy"
+      <div className="relative rounded-xl overflow-hidden bg-card shadow-botanical botanical-border">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={videos[current].videoId}
+            initial={{ opacity: 0, x: 40 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -40 }}
+            transition={{ duration: 0.35 }}
+          >
+            <div className="aspect-video">
+              <iframe
+                src={`https://www.youtube.com/embed/${videos[current].videoId}`}
+                title={videos[current].title}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                className="w-full h-full"
+                loading="lazy"
+              />
+            </div>
+            <div className="px-4 py-3">
+              <p className="text-sm font-medium text-foreground">{videos[current].title}</p>
+            </div>
+          </motion.div>
+        </AnimatePresence>
+
+        {videos.length > 1 && (
+          <>
+            <button
+              onClick={prev}
+              className="absolute left-2 top-1/2 -translate-y-1/2 bg-background/80 backdrop-blur-sm rounded-full p-1.5 text-foreground hover:bg-background transition-colors"
+              aria-label="Previous video"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <button
+              onClick={next}
+              className="absolute right-2 top-1/2 -translate-y-1/2 bg-background/80 backdrop-blur-sm rounded-full p-1.5 text-foreground hover:bg-background transition-colors"
+              aria-label="Next video"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* Dot indicators */}
+      {videos.length > 1 && (
+        <div className="flex justify-center gap-2 pt-1">
+          {videos.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => setCurrent(i)}
+              className={`w-2 h-2 rounded-full transition-colors ${
+                i === current ? "bg-primary" : "bg-muted-foreground/30"
+              }`}
+              aria-label={`Go to video ${i + 1}`}
             />
-          </div>
-          <div className="px-4 py-3">
-            <p className="text-sm font-medium text-foreground">{video.title}</p>
-          </div>
-        </motion.div>
-      ))}
+          ))}
+        </div>
+      )}
     </div>
   );
 }
