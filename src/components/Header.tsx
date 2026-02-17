@@ -43,7 +43,7 @@ export default function Header() {
               {item.label}
             </Link>
           ))}
-          {user && (
+          {user ? (
             <button
               onClick={() => signOut()}
               className="px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex items-center gap-1.5"
@@ -51,6 +51,13 @@ export default function Header() {
               <LogOut className="w-4 h-4" />
               Logout
             </button>
+          ) : (
+            <Link
+              to="/auth"
+              className="px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex items-center gap-1.5"
+            >
+              Login
+            </Link>
           )}
         </nav>
 
@@ -60,7 +67,11 @@ export default function Header() {
           onClick={() => setMobileOpen(!mobileOpen)}
           aria-label="Toggle menu"
         >
-          {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          {mobileOpen ? (
+            <X className="w-5 h-5" />
+          ) : (
+            <Menu className="w-5 h-5" />
+          )}
         </button>
       </div>
 

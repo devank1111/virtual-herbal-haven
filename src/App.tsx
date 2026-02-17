@@ -22,8 +22,8 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
+            <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
-            <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/garden" element={<ProtectedRoute><Garden /></ProtectedRoute>} />
             <Route path="/plant/:id" element={<ProtectedRoute><PlantDetail /></ProtectedRoute>} />
             <Route path="/tour" element={<ProtectedRoute><VirtualTour /></ProtectedRoute>} />
