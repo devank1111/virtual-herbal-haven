@@ -1,18 +1,19 @@
 import { useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Leaf, Mail, Lock, User, ArrowRight } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { toast } from "sonner";
+import { db } from "@/firebase"; // your firebase init file
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 
-export default function Auth() {
-  const { user, loading } = useAuth();
-  const [isLogin, setIsLogin] = useState(true);
+export default function Signup() {
+  const { user, loading, signUp } = useAuth();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const { signIn, signUp } = useAuth();
 
   if (loading) {
     return (
@@ -26,19 +27,44 @@ export default function Auth() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitting(true);
 
-    if (isLogin) {
-      const { error } = await signIn(email, password);
-      if (error) toast.error(error.message);
-      else toast.success("Welcome back!");
-    } else {
-      const { error } = await signUp(email, password, displayName);
-      if (error) toast.error(error.message);
-      else toast.success("Account created! You're now signed in.");
+    const trimmedEmail = email.trim();
+    const trimmedName = displayName.trim();
+
+    if (!trimmedEmail || !password || !trimmedName) {
+      toast.error("Please fill all required fields");
+      return;
     }
 
-    setSubmitting(false);
+    if (password.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const { error, user: newUser } = await signUp(trimmedEmail, password, trimmedName);
+      if (error) throw error;
+
+      // Create user document in Firestore "users" collection
+      if (newUser) {
+        await setDoc(doc(db, "users", newUser.uid), {
+          uid: newUser.uid,
+          displayName: trimmedName,
+          email: trimmedEmail,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          photoURL: null,
+          role: "user",
+        });
+      }
+
+      toast.success("Account created successfully!");
+    } catch (error: any) {
+      toast.error(error.message || "Something went wrong");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -64,56 +90,32 @@ export default function Auth() {
 
         {/* Card */}
         <div className="bg-card/95 backdrop-blur-md rounded-2xl shadow-botanical-lg p-8 border border-border">
-          {/* Toggle */}
-          <div className="flex bg-muted rounded-xl p-1 mb-6">
-            <button
-              onClick={() => setIsLogin(true)}
-              className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all ${
-                isLogin
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Sign In
-            </button>
-            <button
-              onClick={() => setIsLogin(false)}
-              className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all ${
-                !isLogin
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Sign Up
-            </button>
-          </div>
+          <h2 className="text-xl font-bold text-foreground mb-6 text-center">
+            Create Your Account
+          </h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <AnimatePresence mode="wait">
-              {!isLogin && (
-                <motion.div
-                  key="name"
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                >
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Name</label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <input
-                      type="text"
-                      value={displayName}
-                      onChange={(e) => setDisplayName(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                      placeholder="Your name"
-                    />
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                Name
+              </label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input
+                  type="text"
+                  required
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  placeholder="Your name"
+                />
+              </div>
+            </div>
 
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Email</label>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                Email
+              </label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input
@@ -128,7 +130,9 @@ export default function Auth() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Password</label>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                Password
+              </label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input
@@ -148,10 +152,20 @@ export default function Auth() {
               disabled={submitting}
               className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
             >
-              {submitting ? "Please wait..." : isLogin ? "Sign In" : "Create Account"}
+              {submitting ? "Creating account..." : "Create Account"}
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
+
+          <p className="text-center text-sm text-muted-foreground mt-6">
+            Already have an account?{" "}
+            <Link
+              to="/login"
+              className="text-primary font-semibold hover:underline"
+            >
+              Sign In
+            </Link>
+          </p>
         </div>
       </motion.div>
     </div>

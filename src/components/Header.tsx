@@ -53,7 +53,7 @@ export default function Header() {
             </button>
           ) : (
             <Link
-              to="/auth"
+              to="/login"
               className="px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex items-center gap-1.5"
             >
               Login

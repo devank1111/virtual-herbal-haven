@@ -9,7 +9,8 @@ import Index from "./pages/Index";
 import Garden from "./pages/Garden";
 import PlantDetail from "./pages/PlantDetail";
 import VirtualTour from "./pages/VirtualTour";
-import Auth from "./pages/Auth";
+import Signup from "./pages/Signup";
+import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -23,7 +24,8 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
-            <Route path="/auth" element={<Auth />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
             <Route path="/garden" element={<ProtectedRoute><Garden /></ProtectedRoute>} />
             <Route path="/plant/:id" element={<ProtectedRoute><PlantDetail /></ProtectedRoute>} />
             <Route path="/tour" element={<ProtectedRoute><VirtualTour /></ProtectedRoute>} />
