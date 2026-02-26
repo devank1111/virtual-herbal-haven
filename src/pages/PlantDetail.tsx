@@ -2,11 +2,11 @@ import { useParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { plants } from "@/data/plants";
 import { useBookmarks } from "@/hooks/useBookmarks";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
-import PlantDetailHero from "@/components/PlantDetailHero";
-import PlantDetailSections from "@/components/PlantDetailSections";
-import PlantVideos from "@/components/PlantVideos";
+import Header from "@/components/NavFoot/Header";
+import Footer from "@/components/NavFoot/Footer";
+import PlantDetailHero from "@/components/PlantsPortal/PlantDetailHero";
+import PlantDetailSections from "@/components/PlantsPortal/PlantDetailSections";
+import PlantVideos from "@/components/PlantsPortal/PlantVideos";
 
 export default function PlantDetail() {
   const { id } = useParams<{ id: string }>();

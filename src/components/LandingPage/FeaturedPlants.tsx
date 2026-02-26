@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { plants } from "@/data/plants";
-import PlantCard from "./PlantCard";
+import PlantCard from "../PlantsPortal/PlantCard";
 import { useBookmarks } from "@/hooks/useBookmarks";
 import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";

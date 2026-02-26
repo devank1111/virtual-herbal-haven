@@ -2,9 +2,9 @@ import { useState, useMemo } from "react";
 import { Search, Filter, Bookmark, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { plants, categories, type PlantCategory } from "@/data/plants";
-import PlantCard from "@/components/PlantCard";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
+import PlantCard from "@/components/PlantsPortal/PlantCard";
+import Header from "@/components/NavFoot/Header";
+import Footer from "@/components/NavFoot/Footer";
 import { useBookmarks } from "@/hooks/useBookmarks";
 
 export default function Garden() {

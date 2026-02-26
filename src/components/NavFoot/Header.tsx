@@ -4,16 +4,21 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
 
-const navItems = [
-  { label: "Home", path: "/" },
-  { label: "Explore Garden", path: "/garden" },
-  { label: "Virtual Tour", path: "/tour" },
-];
-
 export default function Header() {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { user, signOut } = useAuth();
+
+  const navItems = user
+    ? [
+        { label: "Explore Garden", path: "/garden" },
+        { label: "Virtual Tour", path: "/tour" },
+      ]
+    : [
+        { label: "Home", path: "/" },
+        { label: "Explore Garden", path: "/garden" },
+        { label: "Virtual Tour", path: "/tour" },
+      ];
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">

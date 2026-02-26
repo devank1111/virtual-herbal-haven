@@ -3,8 +3,8 @@ import { motion } from "framer-motion";
 import { ArrowLeft, ArrowRight, Leaf, Info } from "lucide-react";
 import { plants } from "@/data/plants";
 import { Link } from "react-router-dom";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
+import Header from "@/components/NavFoot/Header";
+import Footer from "@/components/NavFoot/Footer";
 
 export default function VirtualTour() {
   const [currentIndex, setCurrentIndex] = useState(0);
