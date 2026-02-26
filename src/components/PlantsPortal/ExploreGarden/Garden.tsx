@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { Search, Filter, Bookmark, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { plants, categories, type PlantCategory } from "@/data/plants";
-import PlantCard from "@/components/PlantsPortal/PlantCard";
+import PlantCard from "@/components/PlantsPortal/ExploreGarden/PlantCard";
 import Header from "@/components/NavFoot/Header";
 import Footer from "@/components/NavFoot/Footer";
 import { useBookmarks } from "@/hooks/useBookmarks";

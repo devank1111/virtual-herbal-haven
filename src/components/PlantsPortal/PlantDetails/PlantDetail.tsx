@@ -6,7 +6,7 @@ import Header from "@/components/NavFoot/Header";
 import Footer from "@/components/NavFoot/Footer";
 import PlantDetailHero from "@/components/PlantsPortal/PlantDetailHero";
 import PlantDetailSections from "@/components/PlantsPortal/PlantDetailSections";
-import PlantVideos from "@/components/PlantsPortal/PlantVideos";
+import PlantVideos from "@/components/PlantsPortal/PlantDetails/PlantVideos";
 
 export default function PlantDetail() {
   const { id } = useParams<{ id: string }>();
