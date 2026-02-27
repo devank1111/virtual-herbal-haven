@@ -29,7 +29,8 @@ export default function Header() {
             <Leaf className="w-5 h-5 text-primary-foreground" />
           </div>
           <span className="font-display text-xl font-bold text-foreground tracking-tight">
-            AYUSH <span className="text-herb-glow">Garden</span>
+            Nature
+            <p className="text-xs text-muted-foreground">organic & natural</p>
           </span>
         </Link>
 
