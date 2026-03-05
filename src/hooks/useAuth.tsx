@@ -8,19 +8,22 @@ import {
   updateProfile
 } from "firebase/auth";
 import { auth } from "@/firebase";
+import { db } from "@/firebase";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+
+interface SignUpData {
+  name: string;
+  age: number;
+  phone: string;
+  email: string;
+  password: string;
+}
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  signUp: (
-    email: string,
-    password: string,
-    displayName?: string
-  ) => Promise<{ error: any; user?: User | null }>;
-  signIn: (
-    email: string,
-    password: string
-  ) => Promise<{ error: any }>;
+  signUp: (data: SignUpData) => Promise<{ error: any; user?: User | null }>;
+  signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
 }
 
@@ -39,17 +42,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe();
   }, []);
 
-  const signUp = async (
-    email: string,
-    password: string,
-    displayName?: string
-  ) => {
+  const signUp = async ({ name, age, phone, email, password }: SignUpData) => {
     try {
       const result = await createUserWithEmailAndPassword(auth, email, password);
 
-      if (displayName) {
-        await updateProfile(result.user, { displayName });
-      }
+      await updateProfile(result.user, {
+        displayName: name,
+      });
+
+      // Firestore user document
+      await setDoc(doc(db, "users", result.user.uid), {
+        uid: result.user.uid,
+        displayName: name,
+        email,
+        age,
+        phone,
+        role: "user",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
 
       return { error: null, user: result.user };
     } catch (error) {

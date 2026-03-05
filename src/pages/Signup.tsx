@@ -1,18 +1,33 @@
 import { useState } from "react";
 import { Navigate, Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { Leaf, Mail, Lock, User, ArrowRight } from "lucide-react";
+import {
+  Leaf,
+  Mail,
+  Lock,
+  User,
+  ArrowRight,
+  Phone,
+  Eye,
+  EyeOff,
+} from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { db } from "@/firebase"; // your firebase init file
+import { db } from "@/firebase";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 
 export default function Signup() {
   const { user, loading, signUp } = useAuth();
 
+  const [displayName, setDisplayName] = useState("");
+  const [age, setAge] = useState("");
+  const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [displayName, setDisplayName] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   if (loading) {
@@ -28,40 +43,62 @@ export default function Signup() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const trimmedEmail = email.trim();
-    const trimmedName = displayName.trim();
-
-    if (!trimmedEmail || !password || !trimmedName) {
+    if (
+      !displayName ||
+      !age ||
+      !phone ||
+      !email ||
+      !password ||
+      !confirmPassword
+    ) {
       toast.error("Please fill all required fields");
       return;
     }
 
-    if (password.length < 6) {
-      toast.error("Password must be at least 6 characters");
+    if (password !== confirmPassword) {
+      toast.error("Passwords do not match");
+      return;
+    }
+
+    if (!/^[0-9]{10}$/.test(phone)) {
+      toast.error("Enter valid 10-digit phone number");
+      return;
+    }
+
+    if (Number(age) < 1 || Number(age) > 120) {
+      toast.error("Please enter a valid age");
       return;
     }
 
     setSubmitting(true);
+
     try {
-      const { error, user: newUser } = await signUp(trimmedEmail, password, trimmedName);
+      const { error, user: newUser } = await signUp({
+        name: displayName.trim(),
+        age: Number(age),
+        phone: phone,
+        email: email.trim(),
+        password: password,
+      });
+
       if (error) throw error;
 
-      // Create user document in Firestore "users" collection
       if (newUser) {
-        await setDoc(doc(db, "users", newUser.uid), {
+        await setDoc(doc(db, "users", newUser.uid),  {
           uid: newUser.uid,
-          displayName: trimmedName,
-          email: trimmedEmail,
+          displayName,
+          email,
+          age: Number(age),
+          phone,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
-          photoURL: null,
           role: "user",
         });
       }
 
       toast.success("Account created successfully!");
     } catch (error: any) {
-      toast.error(error.message || "Something went wrong");
+      toast.error(error.message);
     } finally {
       setSubmitting(false);
     }
@@ -73,99 +110,142 @@ export default function Signup() {
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
-        className="w-full max-w-md"
+        className="w-full max-w-2xl"
       >
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary-foreground/10 backdrop-blur-sm mb-4">
-            <Leaf className="w-8 h-8 text-primary-foreground" />
-          </div>
-          <h1 className="font-display text-3xl font-bold text-primary-foreground">
-            AYUSH <span className="text-[hsl(var(--gold))]">Garden</span>
-          </h1>
-          <p className="text-primary-foreground/70 mt-2 text-sm">
-            Explore the healing wisdom of medicinal plants
-          </p>
-        </div>
+        
+        <div className="bg-card/95 backdrop-blur-md rounded-3xl shadow-2xl p-10 border border-border">
 
-        {/* Card */}
-        <div className="bg-card/95 backdrop-blur-md rounded-2xl shadow-botanical-lg p-8 border border-border">
-          <h2 className="text-xl font-bold text-foreground mb-6 text-center">
-            Create Your Account
-          </h2>
+          <form onSubmit={handleSubmit} className="space-y-6">
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">
-                Name
-              </label>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            {/* Name + Age */}
+            <div className="grid md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium mb-2">Name</label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <input
+                    type="text"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    className="w-full pl-10 pr-4 py-3 rounded-xl border focus:ring-2 focus:ring-primary"
+                    placeholder="Your name"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Age</label>
                 <input
-                  type="text"
-                  required
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  placeholder="Your name"
+                  type="number"
+                  value={age}
+                  onChange={(e) => setAge(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border focus:ring-2 focus:ring-primary"
+                  placeholder="Age"
                 />
               </div>
             </div>
 
+            {/* Phone */}
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">
-                Email
-              </label>
+              <label className="block text-sm font-medium mb-2">Phone</label>
+              <div className="relative">
+                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 rounded-xl border focus:ring-2 focus:ring-primary"
+                  placeholder="10-digit mobile number"
+                />
+              </div>
+            </div>
+
+            {/* Email */}
+            <div>
+              <label className="block text-sm font-medium mb-2">Email</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input
                   type="email"
-                  required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  className="w-full pl-10 pr-4 py-3 rounded-xl border focus:ring-2 focus:ring-primary"
                   placeholder="you@example.com"
                 />
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">
-                Password
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <input
-                  type="password"
-                  required
-                  minLength={6}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  placeholder="••••••••"
-                />
+            {/* Password Row */}
+            <div className="grid md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium mb-2">Password</label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full pl-10 pr-10 py-3 rounded-xl border focus:ring-2 focus:ring-primary"
+                    placeholder="Password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2"
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Confirm Password
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <input
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(e) =>
+                      setConfirmPassword(e.target.value)
+                    }
+                    className="w-full pl-10 pr-10 py-3 rounded-xl border focus:ring-2 focus:ring-primary"
+                    placeholder="Confirm Password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setShowConfirmPassword(!showConfirmPassword)
+                    }
+                    className="absolute right-3 top-1/2 -translate-y-1/2"
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff size={16} />
+                    ) : (
+                      <Eye size={16} />
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
 
+            {/* Submit */}
             <button
               type="submit"
               disabled={submitting}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
+              className="w-full py-3 rounded-xl bg-primary text-white font-semibold hover:scale-[1.02] transition-transform"
             >
-              {submitting ? "Creating account..." : "Create Account"}
-              <ArrowRight className="w-4 h-4" />
+              {submitting ? "Creating Account..." : "Create Account"}
             </button>
-          </form>
 
-          <p className="text-center text-sm text-muted-foreground mt-6">
-            Already have an account?{" "}
-            <Link
-              to="/login"
-              className="text-primary font-semibold hover:underline"
-            >
-              Sign In
-            </Link>
-          </p>
+            <p className="text-center text-sm text-muted-foreground">
+              Already have an account?{" "}
+              <Link to="/login" className="text-primary font-semibold">
+                Sign In
+              </Link>
+            </p>
+          </form>
         </div>
       </motion.div>
     </div>
