@@ -11,6 +11,7 @@ import PlantDetail from "./components/PlantsPortal/PlantDetails/PlantDetail";
 import VirtualTour from "./pages/VirtualTour";
 import Signup from "./pages/Signup";
 import Login from "./pages/Login";
+import Profile from "./components/PlantsPortal/Profile"
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,6 +29,7 @@ const App = () => (
             <Route path="/signup" element={<Signup />} />
             <Route path="/garden" element={<ProtectedRoute><Garden /></ProtectedRoute>} />
             <Route path="/plant/:id" element={<ProtectedRoute><PlantDetail /></ProtectedRoute>} />
+            <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             <Route path="/tour" element={<ProtectedRoute><VirtualTour /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>

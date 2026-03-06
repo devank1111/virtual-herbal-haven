@@ -1,23 +1,25 @@
 import { Link, useLocation } from "react-router-dom";
-import { Leaf, Menu, X, LogOut } from "lucide-react";
+import { Leaf, Menu, X, LogOut, User, Map, ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
+
 
 export default function Header() {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { user, signOut } = useAuth();
+  const [dropdownOpen, setDropdownOpen] = useState(false);
 
   const navItems = user
     ? [
-        { label: "Explore Garden", path: "/garden" },
-        { label: "Virtual Tour", path: "/tour" },
+        // { label: "Explore Garden", path: "/garden" },
+        // { label: "Virtual Tour", path: "/tour" },
       ]
     : [
-        { label: "Home", path: "/" },
-        { label: "Explore Garden", path: "/garden" },
-        { label: "Virtual Tour", path: "/tour" },
+        // { label: "Home", path: "/" },
+        // { label: "Explore Garden", path: "/garden" },
+        // { label: "Virtual Tour", path: "/tour" },
       ];
 
   return (
@@ -50,14 +52,65 @@ export default function Header() {
             </Link>
           ))}
           {user ? (
-            <button
-              onClick={() => signOut()}
-              className="px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex items-center gap-1.5"
-            >
-              <LogOut className="w-4 h-4" />
-              Logout
-            </button>
-          ) : (
+  <div className="relative">
+    <button
+      onClick={() => setDropdownOpen(!dropdownOpen)}
+      className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted transition"
+    >
+      <img
+        src={`https://ui-avatars.com/api/?name=${user.displayName || "User"}`}
+        className="w-8 h-8 rounded-full border"
+        alt="username"
+      />
+
+      <span className="text-sm font-medium">
+        {user.displayName || "User"}
+      </span>
+
+      <ChevronDown
+        className={`w-4 h-4 transition-transform ${
+          dropdownOpen ? "rotate-180" : ""
+        }`}
+      />
+    </button>
+
+    <AnimatePresence>
+      {dropdownOpen && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -8 }}
+          transition={{ duration: 0.2 }}
+          className="absolute right-0 mt-2 w-56 bg-background border border-border rounded-xl shadow-lg overflow-hidden"
+        >
+          <Link
+            to="/profile"
+            className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-muted transition"
+          >
+            <User className="w-4 h-4" />
+            View Profile
+          </Link>
+
+          <Link
+            to="/tour"
+            className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-muted transition"
+          >
+            <Map className="w-4 h-4" />
+            Virtual Tour
+          </Link>
+
+          <button
+            onClick={() => signOut()}
+            className="w-full flex items-center gap-2 px-4 py-3 text-sm hover:bg-muted transition"
+          >
+            <LogOut className="w-4 h-4" />
+            Logout
+          </button>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  </div>
+) : (
             <Link
               to="/login"
               className="px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex items-center gap-1.5"
