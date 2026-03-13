@@ -172,7 +172,7 @@ export default function PlantDetail() {
                 {/* Videos in model tab */}
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
                   <h3 className="text-base font-bold text-gray-700 mb-4">Related Videos</h3>
-                  <PlantVideos plant={plant} />
+                  <PlantVideos plantId={plant.id} plantName={plant.name} />
                 </div>
               </div>
             )}
