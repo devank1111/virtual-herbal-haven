@@ -51,7 +51,7 @@ export default function PlantDetail() {
       <PlantDetailHero
         plant={plant}
         isBookmarked={isBookmarked(plant.id)}
-        onToggleBookmark={() => toggleBookmark(plant.id)}
+        onBookmark={() => toggleBookmark(plant.id)}
         onShare={handleShare}
       />
 
@@ -142,7 +142,24 @@ export default function PlantDetail() {
                     </div>
                   )}
 
-                  {/* Helpful For section removed - conditions not in Plant type */}
+                  {plant.conditions && plant.conditions.length > 0 && (
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                      <h3 className="flex items-center gap-2 text-base font-bold text-gray-800 mb-4">
+                        <span className="w-8 h-8 rounded-xl bg-rose-100 flex items-center justify-center text-base">💊</span>
+                        Helpful For
+                      </h3>
+                      <div className="flex flex-wrap gap-2">
+                        {plant.conditions.map((c: string) => (
+                          <span
+                            key={c}
+                            className="px-3 py-1.5 rounded-full text-sm bg-gray-50 text-gray-700 border border-gray-200 font-medium"
+                          >
+                            {c}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Remaining detail sections */}
@@ -172,7 +189,7 @@ export default function PlantDetail() {
                 {/* Videos in model tab */}
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
                   <h3 className="text-base font-bold text-gray-700 mb-4">Related Videos</h3>
-                  <PlantVideos plantId={plant.id} plantName={plant.name} />
+                  <PlantVideos plant={plant} />
                 </div>
               </div>
             )}

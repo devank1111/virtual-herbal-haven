@@ -475,9 +475,6 @@ export const plants: Plant[] = [
   }
 ];
 
-import { regionalPlants } from "./regionalPlants";
-plants.push(...regionalPlants);
-
 export const categories: PlantCategory[] = [
   "Adaptogen",
   "Digestive",
