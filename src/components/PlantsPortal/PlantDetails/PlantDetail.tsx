@@ -51,7 +51,7 @@ export default function PlantDetail() {
       <PlantDetailHero
         plant={plant}
         isBookmarked={isBookmarked(plant.id)}
-        onBookmark={() => toggleBookmark(plant.id)}
+        onToggleBookmark={() => toggleBookmark(plant.id)}
         onShare={handleShare}
       />
 
