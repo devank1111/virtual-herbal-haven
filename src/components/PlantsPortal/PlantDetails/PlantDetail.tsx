@@ -142,24 +142,7 @@ export default function PlantDetail() {
                     </div>
                   )}
 
-                  {plant.conditions && plant.conditions.length > 0 && (
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-                      <h3 className="flex items-center gap-2 text-base font-bold text-gray-800 mb-4">
-                        <span className="w-8 h-8 rounded-xl bg-rose-100 flex items-center justify-center text-base">💊</span>
-                        Helpful For
-                      </h3>
-                      <div className="flex flex-wrap gap-2">
-                        {plant.conditions.map((c: string) => (
-                          <span
-                            key={c}
-                            className="px-3 py-1.5 rounded-full text-sm bg-gray-50 text-gray-700 border border-gray-200 font-medium"
-                          >
-                            {c}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  {/* Helpful For section removed - conditions not in Plant type */}
                 </div>
 
                 {/* Remaining detail sections */}
