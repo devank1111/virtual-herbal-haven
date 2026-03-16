@@ -1,4 +1,4 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Leaf, Menu, X, LogOut, User, Map, ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -6,10 +6,18 @@ import { useAuth } from "@/hooks/useAuth";
 
 
 export default function Header() {
+  const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { user, signOut } = useAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  const handleLogout = async () => {
+  await signOut();
+  setDropdownOpen(false);
+  setMobileOpen(false);
+  navigate("/");
+};
 
   const navItems = user
     ? [
@@ -100,12 +108,12 @@ export default function Header() {
           </Link>
 
           <button
-            onClick={() => signOut()}
-            className="w-full flex items-center gap-2 px-4 py-3 text-sm hover:bg-muted transition"
-          >
-            <LogOut className="w-4 h-4" />
-            Logout
-          </button>
+  onClick={handleLogout}
+  className="w-full flex items-center gap-2 px-4 py-3 text-sm hover:bg-muted transition"
+>
+  <LogOut className="w-4 h-4" />
+  Logout
+</button>
         </motion.div>
       )}
     </AnimatePresence>

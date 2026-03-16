@@ -5,8 +5,8 @@ import { plants } from "@/data/plants";
 import { useBookmarks } from "@/hooks/useBookmarks";
 import Header from "@/components/NavFoot/Header";
 import Footer from "@/components/NavFoot/Footer";
-import PlantDetailHero from "@/components/PlantsPortal/PlantDetails/PlantDetailHero";
-import PlantDetailSections from "@/components/PlantsPortal/PlantDetails/PlantDetailSections";
+import PlantDetailHero from "@/components/PlantsPortal/Un Used Componets/PlantDetailHero";
+import PlantDetailSections from "@/components/PlantsPortal/Un Used Componets/PlantDetailSections";
 import PlantVideos from "@/components/PlantsPortal/PlantDetails/PlantVideos";
 
 const TABS = [

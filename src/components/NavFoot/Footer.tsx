@@ -10,9 +10,11 @@ export default function Footer() {
             <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
               <Leaf className="w-4 h-4 text-primary-foreground" />
             </div>
-            <span className="font-display text-lg font-bold text-background">
-              AYUSH Garden
-            </span>
+            <Link to="/admin-login">
+              <span className="font-display text-lg font-bold text-background">
+                AYUSH Garden
+              </span>
+            </Link>
           </div>
 
           <nav className="flex items-center gap-6">
