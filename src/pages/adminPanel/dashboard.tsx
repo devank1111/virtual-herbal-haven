@@ -1,41 +1,80 @@
-import React, { useState } from 'react';
-import { 
-  Plus, 
-  Search, 
-  Trash2, 
-  Edit3, 
-  X, 
-  PlusCircle, 
-  FileText, 
-  MapPin, 
-  Beaker, 
-  User, 
+import React, { useState, useEffect } from 'react';
+import {
+  Plus,
+  Search,
+  Trash2,
+  Edit3,
+  X,
+  PlusCircle,
+  FileText,
+  MapPin,
+  Beaker,
+  User,
   AlertCircle,
-  Leaf
+  Leaf,
+  Loader2,
+  Globe,
+  Home,
+  Hash,
+  Languages,
+  BookOpen,
+  Droplets
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { db } from '@/firebase'; // adjust path to your firebase config
+import {
+  collection,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  doc,
+  onSnapshot,
+  serverTimestamp
+} from 'firebase/firestore';
 
+// Updated Plant interface with all new fields
 interface Plant {
   id: string;
   name: string;
   about: string;
   image: string;
-  medicalUse: string;
+  medicinalUse: string[];          // changed from single string to array
   nativeLocation: string;
   keyResearcher: string;
   precautions: string;
   researchPapers: string[];
+  // New fields
+  scientificName: string;
+  hindiName: string;
+  category: string;
+  city: string;
+  state: string;
+  lat?: number;
+  lng?: number;
+  habitat: string;
+  preparation: string;
+  createdAt?: any;
 }
 
+// Initial form state includes all new fields
 const INITIAL_FORM_STATE: Omit<Plant, 'id'> = {
   name: '',
   about: '',
   image: '',
-  medicalUse: '',
+  medicinalUse: [''],               // array with one empty string
   nativeLocation: '',
   keyResearcher: '',
   precautions: '',
   researchPapers: [''],
+  scientificName: '',
+  hindiName: '',
+  category: '',
+  city: '',
+  state: '',
+  lat: undefined,
+  lng: undefined,
+  habitat: '',
+  preparation: '',
 };
 
 export default function PlantDashboard() {
@@ -43,10 +82,31 @@ export default function PlantDashboard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState(INITIAL_FORM_STATE);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Real-time listener for Firestore "plants" collection
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, 'plants'), (snapshot) => {
+      const plantsData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Plant[];
+      setPlants(plantsData);
+    }, (error) => {
+      console.error("Firestore listener error:", error);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const handleOpenModal = (plant?: Plant) => {
     if (plant) {
-      setFormData(plant);
+      // Ensure arrays exist (for old documents that might not have them)
+      setFormData({
+        ...plant,
+        medicinalUse: plant.medicinalUse?.length ? plant.medicinalUse : [''],
+        researchPapers: plant.researchPapers?.length ? plant.researchPapers : [''],
+      });
       setEditingId(plant.id);
     } else {
       setFormData(INITIAL_FORM_STATE);
@@ -61,38 +121,83 @@ export default function PlantDashboard() {
     setEditingId(null);
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>, index?: number) => {
-    const { name, value } = e.target;
-    if (name === 'researchPapers' && typeof index === 'number') {
-      const updatedPapers = [...formData.researchPapers];
-      updatedPapers[index] = value;
-      setFormData({ ...formData, researchPapers: updatedPapers });
+  // Generic input change handler for text/textarea
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value, type } = e.target;
+    // Handle number inputs (lat/lng)
+    if (type === 'number') {
+      setFormData({ ...formData, [name]: value === '' ? undefined : parseFloat(value) });
     } else {
       setFormData({ ...formData, [name]: value });
     }
   };
 
-  const addPaperField = () => {
-    setFormData({ ...formData, researchPapers: [...formData.researchPapers, ''] });
+  // Special handler for array fields (medicinalUse and researchPapers)
+  const handleArrayInputChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    field: 'medicinalUse' | 'researchPapers',
+    index: number
+  ) => {
+    const updatedArray = [...formData[field]];
+    updatedArray[index] = e.target.value;
+    setFormData({ ...formData, [field]: updatedArray });
   };
 
-  const removePaperField = (index: number) => {
-    const updatedPapers = formData.researchPapers.filter((_, i) => i !== index);
-    setFormData({ ...formData, researchPapers: updatedPapers });
+  const addArrayField = (field: 'medicinalUse' | 'researchPapers') => {
+    setFormData({ ...formData, [field]: [...formData[field], ''] });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const removeArrayField = (field: 'medicinalUse' | 'researchPapers', index: number) => {
+    const updatedArray = formData[field].filter((_, i) => i !== index);
+    setFormData({ ...formData, [field]: updatedArray });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingId) {
-      setPlants(plants.map(p => p.id === editingId ? { ...formData, id: editingId } : p));
-    } else {
-      setPlants([...plants, { ...formData, id: Math.random().toString(36).substr(2, 9) }]);
+    setIsSubmitting(true);
+
+    try {
+      // Filter out empty strings from arrays
+      const filteredMedicinalUse = formData.medicinalUse.filter(item => item.trim() !== '');
+      const filteredResearchPapers = formData.researchPapers.filter(item => item.trim() !== '');
+
+      const plantData = {
+        ...formData,
+        medicinalUse: filteredMedicinalUse,
+        researchPapers: filteredResearchPapers,
+        updatedAt: serverTimestamp(),
+      };
+
+      if (editingId) {
+        // Update existing document
+        const plantRef = doc(db, 'plants', editingId);
+        await updateDoc(plantRef, plantData);
+      } else {
+        // Add new document
+        await addDoc(collection(db, 'plants'), {
+          ...plantData,
+          createdAt: serverTimestamp(),
+        });
+      }
+
+      handleCloseModal();
+    } catch (error) {
+      console.error("Error saving plant:", error);
+      alert("Failed to save. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
-    handleCloseModal();
   };
 
-  const deletePlant = (id: string) => {
-    setPlants(plants.filter(p => p.id !== id));
+  const deletePlant = async (id: string) => {
+    if (window.confirm('Are you sure you want to delete this specimen?')) {
+      try {
+        await deleteDoc(doc(db, 'plants', id));
+      } catch (error) {
+        console.error("Error deleting plant:", error);
+        alert("Failed to delete. Please try again.");
+      }
+    }
   };
 
   return (
@@ -104,9 +209,9 @@ export default function PlantDashboard() {
             <div className="w-10 h-10 bg-[oklch(35%_0.05_150)] rounded-xl flex items-center justify-center text-white">
               <Leaf size={20} />
             </div>
-            <h1 className="text-xl font-bold tracking-tight uppercase">Herbarium <span className="font-light opacity-50">Admin</span></h1>
+            <h1 className="text-xl font-bold tracking-tight uppercase">Nature   <span className="font-bold opacity-50">Garden</span></h1>
           </div>
-          <button 
+          <button
             onClick={() => handleOpenModal()}
             className="flex items-center gap-2 bg-[oklch(35%_0.05_150)] text-white px-5 py-2.5 rounded-full font-medium hover:bg-[oklch(25%_0.05_150)] transition-all active:scale-95 shadow-lg shadow-[oklch(35%_0.05_150/0.2)]"
           >
@@ -130,7 +235,7 @@ export default function PlantDashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           <AnimatePresence mode="popLayout">
             {plants.map((plant) => (
-              <motion.div 
+              <motion.div
                 layout
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -165,8 +270,14 @@ export default function PlantDashboard() {
                       </span>
                     )}
                     <span className="px-3 py-1 bg-[oklch(95%_0.01_160)] rounded-full text-[10px] uppercase tracking-widest font-bold flex items-center gap-1.5">
-                      <FileText size={10} /> {plant.researchPapers.filter(p => p.trim()).length} Papers
+                      <FileText size={10} /> {plant.researchPapers?.length || 0} Papers
                     </span>
+                    {/* Optional: show category if exists */}
+                    {plant.category && (
+                      <span className="px-3 py-1 bg-[oklch(95%_0.01_160)] rounded-full text-[10px] uppercase tracking-widest font-bold">
+                        {plant.category}
+                      </span>
+                    )}
                   </div>
                 </div>
               </motion.div>
@@ -179,14 +290,14 @@ export default function PlantDashboard() {
       <AnimatePresence>
         {isModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={handleCloseModal}
               className="absolute inset-0 bg-[oklch(20%_0.02_160/0.4)] backdrop-blur-sm"
             />
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -203,37 +314,79 @@ export default function PlantDashboard() {
               </div>
 
               <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-8 space-y-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Row 1: Basic names */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="space-y-2">
                     <label className="text-[10px] uppercase tracking-widest font-bold opacity-50 flex items-center gap-2">
-                      <Leaf size={12} /> Plant Name
+                      <Leaf size={12} /> Common Name *
                     </label>
-                    <input 
+                    <input
                       required
                       name="name"
                       value={formData.name}
                       onChange={handleInputChange}
                       className="w-full px-4 py-3 bg-[oklch(98%_0.01_160)] border border-[oklch(90%_0.01_160)] rounded-xl focus:ring-2 ring-[oklch(35%_0.05_150/0.2)] outline-none transition-all"
-                      placeholder="e.g. Aloe Barbadensis Miller"
+                      placeholder="e.g. Aloe Vera"
                     />
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] uppercase tracking-widest font-bold opacity-50 flex items-center gap-2">
-                      <MapPin size={12} /> Native Location
+                      <BookOpen size={12} /> Scientific Name
                     </label>
-                    <input 
-                      name="nativeLocation"
-                      value={formData.nativeLocation}
+                    <input
+                      name="scientificName"
+                      value={formData.scientificName}
                       onChange={handleInputChange}
                       className="w-full px-4 py-3 bg-[oklch(98%_0.01_160)] border border-[oklch(90%_0.01_160)] rounded-xl focus:ring-2 ring-[oklch(35%_0.05_150/0.2)] outline-none transition-all"
-                      placeholder="e.g. Arabian Peninsula"
+                      placeholder="Aloe barbadensis miller"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase tracking-widest font-bold opacity-50 flex items-center gap-2">
+                      <Languages size={12} /> Hindi Name
+                    </label>
+                    <input
+                      name="hindiName"
+                      value={formData.hindiName}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 bg-[oklch(98%_0.01_160)] border border-[oklch(90%_0.01_160)] rounded-xl focus:ring-2 ring-[oklch(35%_0.05_150/0.2)] outline-none transition-all"
+                      placeholder="घृतकुमारी"
                     />
                   </div>
                 </div>
 
+                {/* Row 2: Category & Habitat */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase tracking-widest font-bold opacity-50 flex items-center gap-2">
+                      <Hash size={12} /> Category
+                    </label>
+                    <input
+                      name="category"
+                      value={formData.category}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 bg-[oklch(98%_0.01_160)] border border-[oklch(90%_0.01_160)] rounded-xl focus:ring-2 ring-[oklch(35%_0.05_150/0.2)] outline-none transition-all"
+                      placeholder="e.g. Succulent, Herb, Tree"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase tracking-widest font-bold opacity-50 flex items-center gap-2">
+                      <Droplets size={12} /> Habitat
+                    </label>
+                    <input
+                      name="habitat"
+                      value={formData.habitat}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 bg-[oklch(98%_0.01_160)] border border-[oklch(90%_0.01_160)] rounded-xl focus:ring-2 ring-[oklch(35%_0.05_150/0.2)] outline-none transition-all"
+                      placeholder="Tropical, Arid, etc."
+                    />
+                  </div>
+                </div>
+
+                {/* About the plant */}
                 <div className="space-y-2">
                   <label className="text-[10px] uppercase tracking-widest font-bold opacity-50">About the Plant</label>
-                  <textarea 
+                  <textarea
                     name="about"
                     value={formData.about}
                     onChange={handleInputChange}
@@ -243,47 +396,113 @@ export default function PlantDashboard() {
                   />
                 </div>
 
+                {/* Location details: nativeLocation + city/state + lat/lng */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <label className="text-[10px] uppercase tracking-widest font-bold opacity-50 flex items-center gap-2">
-                      <Beaker size={12} /> Medical Use
+                      <MapPin size={12} /> Native Region
                     </label>
-                    <input 
-                      name="medicalUse"
-                      value={formData.medicalUse}
+                    <input
+                      name="nativeLocation"
+                      value={formData.nativeLocation}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 bg-[oklch(98%_0.01_160)] border border-[oklch(90%_0.01_160)] rounded-xl focus:ring-2 ring-[oklch(35%_0.05_150/0.2)] outline-none transition-all"
+                      placeholder="e.g. Arabian Peninsula"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase tracking-widest font-bold opacity-50 flex items-center gap-2">
+                      <Globe size={12} /> City / District
+                    </label>
+                    <input
+                      name="city"
+                      value={formData.city}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 bg-[oklch(98%_0.01_160)] border border-[oklch(90%_0.01_160)] rounded-xl focus:ring-2 ring-[oklch(35%_0.05_150/0.2)] outline-none transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase tracking-widest font-bold opacity-50">State</label>
+                    <input
+                      name="state"
+                      value={formData.state}
                       onChange={handleInputChange}
                       className="w-full px-4 py-3 bg-[oklch(98%_0.01_160)] border border-[oklch(90%_0.01_160)] rounded-xl focus:ring-2 ring-[oklch(35%_0.05_150/0.2)] outline-none transition-all"
                     />
                   </div>
                   <div className="space-y-2">
+                    <label className="text-[10px] uppercase tracking-widest font-bold opacity-50">Latitude</label>
+                    <input
+                      type="number"
+                      step="any"
+                      name="lat"
+                      value={formData.lat ?? ''}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 bg-[oklch(98%_0.01_160)] border border-[oklch(90%_0.01_160)] rounded-xl focus:ring-2 ring-[oklch(35%_0.05_150/0.2)] outline-none transition-all"
+                      placeholder="23.4567"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase tracking-widest font-bold opacity-50">Longitude</label>
+                    <input
+                      type="number"
+                      step="any"
+                      name="lng"
+                      value={formData.lng ?? ''}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 bg-[oklch(98%_0.01_160)] border border-[oklch(90%_0.01_160)] rounded-xl focus:ring-2 ring-[oklch(35%_0.05_150/0.2)] outline-none transition-all"
+                      placeholder="78.9876"
+                    />
+                  </div>
+                </div>
+
+                {/* Researcher & Precautions */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
                     <label className="text-[10px] uppercase tracking-widest font-bold opacity-50 flex items-center gap-2">
                       <User size={12} /> Key Researcher
                     </label>
-                    <input 
+                    <input
                       name="keyResearcher"
                       value={formData.keyResearcher}
                       onChange={handleInputChange}
                       className="w-full px-4 py-3 bg-[oklch(98%_0.01_160)] border border-[oklch(90%_0.01_160)] rounded-xl focus:ring-2 ring-[oklch(35%_0.05_150/0.2)] outline-none transition-all"
                     />
                   </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase tracking-widest font-bold opacity-50 flex items-center gap-2 text-amber-700">
+                      <AlertCircle size={12} /> Precautions
+                    </label>
+                    <input
+                      name="precautions"
+                      value={formData.precautions}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 bg-amber-50/50 border border-amber-200 rounded-xl focus:ring-2 ring-amber-200 outline-none transition-all"
+                      placeholder="e.g. Do not consume during pregnancy"
+                    />
+                  </div>
                 </div>
 
+                {/* Preparation (new textarea) */}
                 <div className="space-y-2">
-                  <label className="text-[10px] uppercase tracking-widest font-bold opacity-50 flex items-center gap-2 text-amber-700">
-                    <AlertCircle size={12} /> Precautions
-                  </label>
-                  <input 
-                    name="precautions"
-                    value={formData.precautions}
+                  <label className="text-[10px] uppercase tracking-widest font-bold opacity-50">Preparation / Usage Method</label>
+                  <textarea
+                    name="preparation"
+                    value={formData.preparation}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-3 bg-amber-50/50 border border-amber-200 rounded-xl focus:ring-2 ring-amber-200 outline-none transition-all"
-                    placeholder="e.g. Do not consume during pregnancy"
+                    rows={2}
+                    className="w-full px-4 py-3 bg-[oklch(98%_0.01_160)] border border-[oklch(90%_0.01_160)] rounded-xl focus:ring-2 ring-[oklch(35%_0.05_150/0.2)] outline-none transition-all resize-none"
+                    placeholder="How to prepare or use this plant..."
                   />
                 </div>
 
+                {/* Image URL */}
                 <div className="space-y-2">
                   <label className="text-[10px] uppercase tracking-widest font-bold opacity-50">Image URL</label>
-                  <input 
+                  <input
                     name="image"
                     value={formData.image}
                     onChange={handleInputChange}
@@ -292,33 +511,33 @@ export default function PlantDashboard() {
                   />
                 </div>
 
+                {/* Medicinal Use (array) */}
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <label className="text-[10px] uppercase tracking-widest font-bold opacity-50 flex items-center gap-2">
-                      <FileText size={12} /> Research Papers
+                      <Beaker size={12} /> Medicinal Uses
                     </label>
-                    <button 
+                    <button
                       type="button"
-                      onClick={addPaperField}
+                      onClick={() => addArrayField('medicinalUse')}
                       className="text-xs font-bold text-[oklch(35%_0.05_150)] flex items-center gap-1 hover:opacity-70"
                     >
-                      <PlusCircle size={14} /> Add More
+                      <PlusCircle size={14} /> Add Use
                     </button>
                   </div>
                   <div className="space-y-3">
-                    {formData.researchPapers.map((paper, index) => (
+                    {formData.medicinalUse.map((use, index) => (
                       <div key={index} className="flex gap-2">
-                        <input 
-                          name="researchPapers"
-                          value={paper}
-                          onChange={(e) => handleInputChange(e, index)}
+                        <input
+                          value={use}
+                          onChange={(e) => handleArrayInputChange(e, 'medicinalUse', index)}
                           className="flex-1 px-4 py-3 bg-[oklch(98%_0.01_160)] border border-[oklch(90%_0.01_160)] rounded-xl focus:ring-2 ring-[oklch(35%_0.05_150/0.2)] outline-none transition-all"
-                          placeholder="DOI or Paper URL"
+                          placeholder="e.g. Anti-inflammatory, Digestive aid"
                         />
-                        {formData.researchPapers.length > 1 && (
-                          <button 
+                        {formData.medicinalUse.length > 1 && (
+                          <button
                             type="button"
-                            onClick={() => removePaperField(index)}
+                            onClick={() => removeArrayField('medicinalUse', index)}
                             className="p-3 text-red-400 hover:bg-red-50 rounded-xl transition-colors"
                           >
                             <Trash2 size={18} />
@@ -329,14 +548,60 @@ export default function PlantDashboard() {
                   </div>
                 </div>
 
+                {/* Research Papers (array) */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] uppercase tracking-widest font-bold opacity-50 flex items-center gap-2">
+                      <FileText size={12} /> Research Papers
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => addArrayField('researchPapers')}
+                      className="text-xs font-bold text-[oklch(35%_0.05_150)] flex items-center gap-1 hover:opacity-70"
+                    >
+                      <PlusCircle size={14} /> Add Paper
+                    </button>
+                  </div>
+                  <div className="space-y-3">
+                    {formData.researchPapers.map((paper, index) => (
+                      <div key={index} className="flex gap-2">
+                        <input
+                          value={paper}
+                          onChange={(e) => handleArrayInputChange(e, 'researchPapers', index)}
+                          className="flex-1 px-4 py-3 bg-[oklch(98%_0.01_160)] border border-[oklch(90%_0.01_160)] rounded-xl focus:ring-2 ring-[oklch(35%_0.05_150/0.2)] outline-none transition-all"
+                          placeholder="DOI or Paper URL"
+                        />
+                        {formData.researchPapers.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeArrayField('researchPapers', index)}
+                            className="p-3 text-red-400 hover:bg-red-50 rounded-xl transition-colors"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Submit Buttons */}
                 <div className="pt-6 flex gap-4">
-                  <button 
+                  <button
                     type="submit"
-                    className="flex-1 bg-[oklch(35%_0.05_150)] text-white py-4 rounded-2xl font-bold hover:bg-[oklch(25%_0.05_150)] transition-all shadow-xl shadow-[oklch(35%_0.05_150/0.2)]"
+                    disabled={isSubmitting}
+                    className="flex-1 bg-[oklch(35%_0.05_150)] text-white py-4 rounded-2xl font-bold hover:bg-[oklch(25%_0.05_150)] transition-all shadow-xl shadow-[oklch(35%_0.05_150/0.2)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
-                    {editingId ? 'Update Specimen' : 'Save to Archive'}
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 size={20} className="animate-spin" />
+                        {editingId ? 'Updating...' : 'Saving...'}
+                      </>
+                    ) : (
+                      editingId ? 'Update Specimen' : 'Save to Archive'
+                    )}
                   </button>
-                  <button 
+                  <button
                     type="button"
                     onClick={handleCloseModal}
                     className="px-8 py-4 border border-[oklch(90%_0.01_160)] rounded-2xl font-bold hover:bg-[oklch(95%_0.01_160)] transition-all"
