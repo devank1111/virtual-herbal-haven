@@ -1,31 +1,59 @@
 import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { cityPlants, CityData } from "@/data/cityPlants";
-import { plants } from "@/data/plants";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, MapPin } from "lucide-react";
+import { db } from "@/firebase";
+import { collection, getDocs } from "firebase/firestore";
+
+interface Plant {
+  id: string;
+  name: string;
+  scientificName: string;
+  image: string;
+  category: string[];
+  state: string;
+}
 
 export default function IndiaMap() {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const geoJsonLayerRef = useRef<L.GeoJSON | null>(null);
   const labelLayerRef = useRef<L.LayerGroup | null>(null);
-  const [selectedCity, setSelectedCity] = useState<CityData | null>(null);
 
-  // Group cityPlants by state name (merge plantIds if multiple cities per state)
-  const stateDataMap = cityPlants.reduce<Record<string, CityData>>((acc, city) => {
-    const key = city.state;
-    if (!acc[key]) {
-      acc[key] = { ...city, plantIds: [...city.plantIds] };
-    } else {
-      const merged = Array.from(new Set([...acc[key].plantIds, ...city.plantIds]));
-      acc[key] = { ...acc[key], plantIds: merged };
-    }
-    return acc;
-  }, {});
+  // ✅ KEY FIX: statesWithData aur plants dono ref mein — click handlers stale closure se bachenge
+  const plantsRef = useRef<Plant[]>([]);
+  const statesWithDataRef = useRef<Set<string>>(new Set());
 
+  const [plants, setPlants] = useState<Plant[]>([]);
+  const [loadingPlants, setLoadingPlants] = useState(true);
+  const [selectedState, setSelectedState] = useState<string | null>(null);
+
+  // ── Firebase se plants fetch ──────────────────────────────────────────────
+  useEffect(() => {
+    const fetchPlants = async () => {
+      try {
+        const snapshot = await getDocs(collection(db, "plants"));
+        const data = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as Plant[];
+
+        // Dono ref aur state update karo
+        plantsRef.current = data;
+        statesWithDataRef.current = new Set(data.map((p) => p.state));
+        setPlants(data);
+      } catch (err) {
+        console.error("Firebase fetch error:", err);
+      } finally {
+        setLoadingPlants(false);
+      }
+    };
+    fetchPlants();
+  }, []);
+
+  // ── Leaflet map init (sirf ek baar) ──────────────────────────────────────
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current) return;
 
@@ -38,12 +66,14 @@ export default function IndiaMap() {
       maxZoom: 10,
     });
 
-    // Clean base tile - no default labels (we add our own state labels)
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png", {
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
-      maxZoom: 18,
-    }).addTo(map);
+    L.tileLayer(
+      "https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png",
+      {
+        attribution:
+          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+        maxZoom: 18,
+      }
+    ).addTo(map);
 
     const labelLayer = L.layerGroup().addTo(map);
     labelLayerRef.current = labelLayer;
@@ -57,7 +87,8 @@ export default function IndiaMap() {
           style: (feature) => {
             const name =
               feature?.properties?.NAME_1 || feature?.properties?.name || "";
-            const hasData = !!stateDataMap[name];
+            // Ref se latest data padhega — stale closure nahi hoga
+            const hasData = statesWithDataRef.current.has(name);
             return {
               fillColor: hasData ? "#2d6a4f" : "#b7d4c6",
               fillOpacity: hasData ? 0.6 : 0.28,
@@ -69,46 +100,50 @@ export default function IndiaMap() {
           onEachFeature: (feature, featureLayer) => {
             const stateName =
               feature?.properties?.NAME_1 || feature?.properties?.name || "";
-            const cityData = stateDataMap[stateName];
-            const hasData = !!cityData;
 
-            // Centroid for label placement
             const bounds = (featureLayer as L.Polygon).getBounds();
             const center = bounds.getCenter();
 
-            // DivIcon: leaf logo on top + state name below
-            const labelHtml = `
-              <div class="state-label-wrapper ${hasData ? "has-plants" : ""}">
-                ${hasData ? `<img src="/leaf.png" class="state-leaf-icon" alt="plant" />` : ""}
-                <span class="state-label-text">${stateName}</span>
-              </div>
-            `;
+            // Label add karo
+            const addLabel = (hasData: boolean) => {
+              const labelHtml = `
+                <div class="state-label-wrapper ${hasData ? "has-plants" : ""}">
+                  ${hasData ? `<img src="/leaf.png" class="state-leaf-icon" alt="plant" />` : ""}
+                  <span class="state-label-text">${stateName}</span>
+                </div>
+              `;
+              return L.marker(center, {
+                icon: L.divIcon({
+                  html: labelHtml,
+                  className: "",
+                  iconAnchor: [40, hasData ? 28 : 8],
+                  iconSize: [80, hasData ? 36 : 16],
+                }),
+                interactive: false,
+              });
+            };
 
-            const labelIcon = L.divIcon({
-              html: labelHtml,
-              className: "",
-              // Center the label on the state centroid
-              iconAnchor: [40, hasData ? 28 : 8],
-              iconSize: [80, hasData ? 36 : 16],
-            });
-
-            L.marker(center, { icon: labelIcon, interactive: false }).addTo(labelLayer);
+            addLabel(false).addTo(labelLayer);
 
             featureLayer.on({
               mouseover: (e) => {
-                const l = e.target as L.Path;
-                l.setStyle({
+                // ✅ Ref se real-time check
+                const hasData = statesWithDataRef.current.has(stateName);
+                (e.target as L.Path).setStyle({
                   fillOpacity: hasData ? 0.85 : 0.42,
                   weight: 2.8,
                   color: hasData ? "#52b788" : "#aaa",
                 });
-                l.bringToFront();
+                (e.target as L.Path).bringToFront();
               },
               mouseout: (e) => {
                 layer.resetStyle(e.target as L.Path);
               },
               click: () => {
-                if (!cityData) return;
+                // ✅ Ref se check — kabhi stale nahi hoga
+                const hasData = statesWithDataRef.current.has(stateName);
+                if (!hasData) return;
+
                 layer.resetStyle();
                 (featureLayer as L.Path).setStyle({
                   fillColor: "#1b4332",
@@ -116,9 +151,11 @@ export default function IndiaMap() {
                   color: "#95d5b2",
                   weight: 3,
                 });
-                setSelectedCity(cityData);
-                const stateBounds = (featureLayer as L.Polygon).getBounds();
-                map.flyToBounds(stateBounds, { padding: [40, 40], duration: 0.9 });
+                setSelectedState(stateName);
+                map.flyToBounds(
+                  (featureLayer as L.Polygon).getBounds(),
+                  { padding: [40, 40], duration: 0.9 }
+                );
               },
             });
           },
@@ -126,26 +163,76 @@ export default function IndiaMap() {
 
         geoJsonLayerRef.current = layer;
       })
-      .catch((err) => {
-        console.error("Failed to load India GeoJSON:", err);
-      });
+      .catch((err) => console.error("GeoJSON load error:", err));
 
     mapInstanceRef.current = map;
-
     return () => {
       map.remove();
       mapInstanceRef.current = null;
     };
   }, []);
 
-  const cityPlantDetails = selectedCity
-    ? plants.filter((p) => selectedCity.plantIds.includes(p.id))
+  // ── Plants load hone ke baad map re-style + labels rebuild ───────────────
+  useEffect(() => {
+    if (loadingPlants || !geoJsonLayerRef.current || !labelLayerRef.current)
+      return;
+
+    // State polygons re-colour
+    geoJsonLayerRef.current.eachLayer((fl) => {
+      const layer = fl as L.Path & { feature?: any };
+      const stateName =
+        layer.feature?.properties?.NAME_1 ||
+        layer.feature?.properties?.name ||
+        "";
+      const hasData = statesWithDataRef.current.has(stateName);
+      layer.setStyle({
+        fillColor: hasData ? "#2d6a4f" : "#b7d4c6",
+        fillOpacity: hasData ? 0.6 : 0.28,
+        color: "#ffffff",
+        weight: 1.8,
+        opacity: 1,
+      });
+    });
+
+    // Labels rebuild with leaf icons for states that have data
+    labelLayerRef.current.clearLayers();
+    geoJsonLayerRef.current.eachLayer((fl) => {
+      const layer = fl as L.Polygon & { feature?: any };
+      const stateName =
+        layer.feature?.properties?.NAME_1 ||
+        layer.feature?.properties?.name ||
+        "";
+      const hasData = statesWithDataRef.current.has(stateName);
+      const center = layer.getBounds().getCenter();
+
+      const labelHtml = `
+        <div class="state-label-wrapper ${hasData ? "has-plants" : ""}">
+          ${hasData ? `<img src="/leaf.png" class="state-leaf-icon" alt="plant" />` : ""}
+          <span class="state-label-text">${stateName}</span>
+        </div>
+      `;
+
+      L.marker(center, {
+        icon: L.divIcon({
+          html: labelHtml,
+          className: "",
+          iconAnchor: [40, hasData ? 28 : 8],
+          iconSize: [80, hasData ? 36 : 16],
+        }),
+        interactive: false,
+      }).addTo(labelLayerRef.current!);
+    });
+  }, [loadingPlants, plants]);
+
+  // ── Selected state ke plants ──────────────────────────────────────────────
+  const statePlants = selectedState
+    ? plantsRef.current.filter((p) => p.state === selectedState)
     : [];
 
   return (
     <section className="py-16 bg-background">
       <div className="container mx-auto px-4">
-        {/* Heading */}
+
         <div className="text-center mb-10">
           <span className="text-sm font-semibold uppercase tracking-widest text-accent">
             Explore by Location
@@ -159,18 +246,30 @@ export default function IndiaMap() {
         </div>
 
         <div className="relative rounded-2xl overflow-hidden shadow-botanical-lg border border-border">
-          {/* Map container */}
+
           <div ref={mapRef} className="w-full h-[600px] z-0" />
+
+          {/* Loading overlay */}
+          {loadingPlants && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/60 backdrop-blur-sm">
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                <p className="text-sm text-muted-foreground font-medium">
+                  Loading plant data…
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Legend */}
           <div className="absolute bottom-6 left-4 z-10 bg-white/90 backdrop-blur-sm border border-border rounded-xl px-4 py-3 flex flex-col gap-2 shadow-md">
             <p className="text-xs font-bold text-foreground mb-1">Legend</p>
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded-sm" style={{ background: "#2d6a4f", opacity: 0.75 }} />
+              <div className="w-3.5 h-3.5 rounded-full" style={{ background: "#2d6a4f" }} />
               <span className="text-xs text-muted-foreground">Has medicinal plants</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded-sm" style={{ background: "#b7d4c6", opacity: 0.6 }} />
+              <div className="w-3.5 h-3.5 rounded-full" style={{ background: "#b7d4c6" }} />
               <span className="text-xs text-muted-foreground">No data yet</span>
             </div>
             <div className="flex items-center gap-2">
@@ -181,7 +280,7 @@ export default function IndiaMap() {
 
           {/* Side Panel */}
           <AnimatePresence>
-            {selectedCity && (
+            {selectedState && (
               <motion.div
                 initial={{ x: "100%", opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}
@@ -190,20 +289,19 @@ export default function IndiaMap() {
                 className="absolute top-0 right-0 h-full w-full sm:w-96 bg-card/95 backdrop-blur-md border-l border-border z-10 overflow-y-auto"
               >
                 <div className="p-5">
-                  {/* Panel Header */}
-                  <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2">
                       <MapPin className="w-5 h-5 text-primary" />
                       <div>
                         <h3 className="font-display text-lg font-bold text-foreground">
-                          {selectedCity.state}
+                          {selectedState}
                         </h3>
                         <p className="text-xs text-muted-foreground">India</p>
                       </div>
                     </div>
                     <button
                       onClick={() => {
-                        setSelectedCity(null);
+                        setSelectedState(null);
                         geoJsonLayerRef.current?.resetStyle();
                         mapInstanceRef.current?.flyTo([22.5, 82], 5, { duration: 0.8 });
                       }}
@@ -214,12 +312,11 @@ export default function IndiaMap() {
                   </div>
 
                   <p className="text-sm text-muted-foreground mb-4">
-                    {cityPlantDetails.length} medicinal plant
-                    {cityPlantDetails.length !== 1 ? "s" : ""} found
+                    {statePlants.length} medicinal plant{statePlants.length !== 1 ? "s" : ""} found
                   </p>
 
                   <div className="space-y-3">
-                    {cityPlantDetails.map((plant) => (
+                    {statePlants.map((plant) => (
                       <Link
                         key={plant.id}
                         to={`/plant/${plant.id}`}
@@ -228,36 +325,48 @@ export default function IndiaMap() {
                         <img
                           src={plant.image}
                           alt={plant.name}
-                          className="w-14 h-14 rounded-lg object-cover"
+                          className="w-14 h-14 rounded-lg object-cover flex-shrink-0"
                         />
                         <div className="flex-1 min-w-0">
-                          <h4 className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors">
+                          <h4 className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors truncate">
                             {plant.name}
                           </h4>
-                          <p className="text-xs text-muted-foreground italic">
+                          <p className="text-xs text-muted-foreground italic truncate mb-1">
                             {plant.scientificName}
                           </p>
-                          <div className="flex gap-1 mt-1 flex-wrap">
-                            {plant.category.slice(0, 2).map((cat) => (
-                              <span
-                                key={cat}
-                                className="text-[10px] px-1.5 py-0.5 rounded-full bg-secondary text-secondary-foreground"
-                              >
-                                {cat}
-                              </span>
-                            ))}
+                          <div className="flex gap-1 flex-wrap">
+                            {(Array.isArray(plant.category)
+                              ? plant.category
+                              : [plant.category]
+                            )
+                              .slice(0, 2)
+                              .map((cat) => (
+                                <span
+                                  key={cat}
+                                  className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground font-medium"
+                                >
+                                  {cat}
+                                </span>
+                              ))}
                           </div>
                         </div>
-                        {/* Leaf logo in side panel list */}
-                        <img
-                          src="/leaf.png"
-                          className="w-5 h-5 object-contain opacity-40 group-hover:opacity-100 transition-opacity"
-                          alt="leaf"
-                        />
+                        <svg
+                          className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9 5l7 7-7 7"
+                          />
+                        </svg>
                       </Link>
                     ))}
 
-                    {cityPlantDetails.length === 0 && (
+                    {statePlants.length === 0 && (
                       <p className="text-sm text-muted-foreground text-center py-8">
                         No plants found for this state.
                       </p>
@@ -270,9 +379,7 @@ export default function IndiaMap() {
         </div>
       </div>
 
-      {/* ─── Styles for state labels rendered inside Leaflet ─── */}
       <style>{`
-        /* Wrapper for each state label */
         .state-label-wrapper {
           display: flex;
           flex-direction: column;
@@ -281,8 +388,6 @@ export default function IndiaMap() {
           pointer-events: none;
           width: 80px;
         }
-
-        /* Leaf logo that pulses gently on plant-states */
         .state-leaf-icon {
           width: 20px;
           height: 20px;
@@ -290,37 +395,27 @@ export default function IndiaMap() {
           filter: drop-shadow(0 1px 3px rgba(0,0,0,0.35));
           animation: leafPulse 2.6s ease-in-out infinite;
         }
-
         @keyframes leafPulse {
           0%, 100% { transform: scale(1);    opacity: 0.85; }
           50%       { transform: scale(1.2); opacity: 1;    }
         }
-
-        /* State name text — visible on all states */
         .state-label-text {
           font-size: 9px;
           font-weight: 700;
           text-align: center;
           white-space: nowrap;
           color: #1b4332;
-          /* White halo so it reads over any fill color */
           text-shadow:
-            0 0 3px #fff,
-            0 0 6px #fff,
-            1px  1px 0 #fff,
-           -1px -1px 0 #fff,
-            1px -1px 0 #fff,
-           -1px  1px 0 #fff;
+            0 0 3px #fff, 0 0 6px #fff,
+            1px 1px 0 #fff, -1px -1px 0 #fff,
+            1px -1px 0 #fff, -1px 1px 0 #fff;
           letter-spacing: 0.3px;
           line-height: 1.2;
         }
-
-        /* Slightly larger text for states with plant data */
         .has-plants .state-label-text {
           color: #081c15;
           font-size: 10px;
         }
-
         .leaflet-container {
           font-family: inherit;
           background: #e8f4f0;

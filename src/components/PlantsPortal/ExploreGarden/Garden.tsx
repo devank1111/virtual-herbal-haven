@@ -1,17 +1,69 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Search, Filter, Bookmark, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { plants, categories, type PlantCategory } from "@/data/plants";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "@/firebase";
 import PlantCard from "@/components/PlantsPortal/ExploreGarden/PlantCard";
 import Header from "@/components/NavFoot/Header";
 import Footer from "@/components/NavFoot/Footer";
 import { useBookmarks } from "@/hooks/useBookmarks";
 
+export type PlantCategory = string;
+
+export interface Plant {
+  id: string;
+  name: string;
+  scientificName: string;
+  hindiName: string;
+  description: string;
+  image: string;
+  category: string | string[];
+  medicinalUses: string[];
+}
+
+// Helper: category ko hamesha array mein convert karo
+function toArray(category: string | string[] | undefined): string[] {
+  if (!category) return [];
+  if (Array.isArray(category)) return category;
+  return category.split(",").map((c) => c.trim()).filter(Boolean);
+}
+
 export default function Garden() {
+  const [plants, setPlants] = useState<Plant[]>([]);
+  const [categories, setCategories] = useState<PlantCategory[]>([]);
+  const [loadingPlants, setLoadingPlants] = useState(true);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategories, setSelectedCategories] = useState<PlantCategory[]>([]);
   const [showBookmarked, setShowBookmarked] = useState(false);
   const { bookmarks, isBookmarked, toggleBookmark } = useBookmarks();
+
+  // Firebase se plants fetch karo
+  useEffect(() => {
+    const fetchPlants = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, "plants"));
+        const plantsData: Plant[] = querySnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as Plant[];
+
+        setPlants(plantsData);
+
+        // Categories dynamically extract karo — string ya array dono handle karo
+        const allCategories = Array.from(
+          new Set(plantsData.flatMap((p) => toArray(p.category)))
+        );
+        setCategories(allCategories);
+      } catch (err) {
+        console.error("Plants fetch karne mein error:", err);
+      } finally {
+        setLoadingPlants(false);
+      }
+    };
+
+    fetchPlants();
+  }, []);
 
   const toggleCategory = (cat: PlantCategory) => {
     setSelectedCategories((prev) =>
@@ -27,19 +79,20 @@ export default function Garden() {
         plant.scientificName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         plant.hindiName.includes(searchQuery) ||
         plant.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        plant.medicinalUses.some((use) =>
+        (plant.medicinalUses ?? []).some((use) =>
           use.toLowerCase().includes(searchQuery.toLowerCase())
         );
 
+      const plantCategories = toArray(plant.category);
       const matchesCategory =
         selectedCategories.length === 0 ||
-        plant.category.some((cat) => selectedCategories.includes(cat));
+        plantCategories.some((cat) => selectedCategories.includes(cat));
 
       const matchesBookmark = !showBookmarked || bookmarks.includes(plant.id);
 
       return matchesSearch && matchesCategory && matchesBookmark;
     });
-  }, [searchQuery, selectedCategories, showBookmarked, bookmarks]);
+  }, [searchQuery, selectedCategories, showBookmarked, bookmarks, plants]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -144,45 +197,51 @@ export default function Garden() {
           </motion.div>
 
           {/* Plant Grid */}
-          <AnimatePresence mode="wait">
-            {filteredPlants.length > 0 ? (
-              <motion.div
-                key="grid"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
-              >
-                {filteredPlants.map((plant, i) => (
-                  <PlantCard
-                    key={plant.id}
-                    plant={plant}
-                    isBookmarked={isBookmarked(plant.id)}
-                    onToggleBookmark={toggleBookmark}
-                    index={i}
-                  />
-                ))}
-              </motion.div>
-            ) : (
-              <motion.div
-                key="empty"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                className="text-center py-20"
-              >
-                <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
-                  <Search className="w-7 h-7 text-muted-foreground" />
-                </div>
-                <h3 className="font-display text-xl font-bold text-foreground mb-2">
-                  No plants found
-                </h3>
-                <p className="text-muted-foreground">
-                  Try adjusting your search or filter criteria.
-                </p>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {loadingPlants ? (
+            <div className="flex items-center justify-center py-20">
+              <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+            </div>
+          ) : (
+            <AnimatePresence mode="wait">
+              {filteredPlants.length > 0 ? (
+                <motion.div
+                  key="grid"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+                >
+                  {filteredPlants.map((plant, i) => (
+                    <PlantCard
+                      key={plant.id}
+                      plant={plant}
+                      isBookmarked={isBookmarked(plant.id)}
+                      onToggleBookmark={toggleBookmark}
+                      index={i}
+                    />
+                  ))}
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="empty"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  className="text-center py-20"
+                >
+                  <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
+                    <Search className="w-7 h-7 text-muted-foreground" />
+                  </div>
+                  <h3 className="font-display text-xl font-bold text-foreground mb-2">
+                    No plants found
+                  </h3>
+                  <p className="text-muted-foreground">
+                    Try adjusting your search or filter criteria.
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          )}
         </div>
       </main>
 

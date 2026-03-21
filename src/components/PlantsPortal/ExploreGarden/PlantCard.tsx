@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { Bookmark, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
-import type { Plant } from "@/data/plants";
+import type { Plant } from "@/hooks/usePlants";
 
 interface PlantCardProps {
   plant: Plant;
@@ -11,6 +11,13 @@ interface PlantCardProps {
 }
 
 export default function PlantCard({ plant, isBookmarked, onToggleBookmark, index = 0 }: PlantCardProps) {
+  // category string → array convert karo
+  const categories = Array.isArray(plant.category)
+    ? plant.category
+    : typeof plant.category === "string"
+    ? plant.category.split(",").map((c) => c.trim()).filter(Boolean)
+    : [];
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 30 }}
@@ -47,7 +54,7 @@ export default function PlantCard({ plant, isBookmarked, onToggleBookmark, index
 
         {/* Categories */}
         <div className="absolute bottom-3 left-3 flex flex-wrap gap-1.5">
-          {plant.category.slice(0, 2).map((cat) => (
+          {categories.slice(0, 2).map((cat) => (
             <span
               key={cat}
               className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/90 text-primary-foreground backdrop-blur-sm"
