@@ -20,6 +20,8 @@ import {
   HeartPulse,
   BookOpen,
   Utensils,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────
@@ -143,11 +145,15 @@ function PlantDetailHero({
   isBookmarked,
   onBookmark,
   onShare,
+  isSpeaking,
+  onToggleSpeech,
 }: {
   plant: Plant;
   isBookmarked: boolean;
   onBookmark: () => void;
   onShare: () => void;
+  isSpeaking: boolean;
+  onToggleSpeech: () => void;
 }) {
   // category is a plain string in Firebase — split by comma for multiple badges
   const categories = plant.category
@@ -215,9 +221,30 @@ function PlantDetailHero({
             ))}
           </div>
         )}
-        <h1 className="text-[2.6rem] sm:text-5xl font-bold text-white leading-none tracking-tight mb-1.5">
-          {plant.name}
-        </h1>
+
+        {/* Plant name row with speaker button */}
+        <div className="flex items-center gap-3 mb-1.5">
+          <h1 className="text-[2.6rem] sm:text-5xl font-bold text-white leading-none tracking-tight">
+            {plant.name}
+          </h1>
+          <button
+            onClick={onToggleSpeech}
+            aria-label={isSpeaking ? "Stop reading" : "Read aloud"}
+            title={isSpeaking ? "Stop reading" : "Read plant details aloud"}
+            className={`flex-shrink-0 w-9 h-9 rounded-xl backdrop-blur-md border flex items-center justify-center transition-all duration-200 ${
+              isSpeaking
+                ? "bg-green-500/30 border-green-400/50 hover:bg-green-500/40"
+                : "bg-black/25 border-white/15 hover:bg-black/40"
+            }`}
+          >
+            {isSpeaking ? (
+              <VolumeX className="w-4 h-4 text-green-300" />
+            ) : (
+              <Volume2 className="w-4 h-4 text-white/90" />
+            )}
+          </button>
+        </div>
+
         <p className="text-[15px] italic text-white/55 font-light">
           {plant.scientificName}
           {plant.hindiName && (
@@ -479,6 +506,143 @@ export default function PlantDetail() {
   const { isBookmarked, toggleBookmark } = useBookmarks();
   const [activeTab, setActiveTab] = useState<TabId>("overview");
 
+  // ── TTS STATE — parent me manage, hero ko props se pass ──
+  const [isSpeaking, setIsSpeaking] = useState(false);
+
+  // Jab plant change ho ya component unmount ho, speech band karo
+  useEffect(() => {
+    return () => {
+      window.speechSynthesis.cancel();
+    };
+  }, [id]);
+
+  // Hindi female voice dhundho — voices async load hoti hain
+  // ── HINDI FEMALE VOICE — known Google/Microsoft female voice names target karo ──
+  const getHindiFemaleVoice = (): SpeechSynthesisVoice | null => {
+    const voices = window.speechSynthesis.getVoices();
+    // Priority 1: Google Hindi (Chrome) — Google ki hi-IN voice usually female hoti hai
+    const googleHindi = voices.find(
+      (v) => v.lang === "hi-IN" && /google/i.test(v.name)
+    );
+    if (googleHindi) return googleHindi;
+    // Priority 2: Microsoft Swara / Kalpana (Windows Hindi female voices)
+    const msHindiFemale = voices.find(
+      (v) => v.lang === "hi-IN" && /swara|kalpana/i.test(v.name)
+    );
+    if (msHindiFemale) return msHindiFemale;
+    // Priority 3: hi-IN me koi bhi jo "male" na ho
+    const hindiNotMale = voices.find(
+      (v) => v.lang === "hi-IN" && !/male/i.test(v.name)
+    );
+    if (hindiNotMale) return hindiNotMale;
+    // Priority 4: koi bhi hi-IN
+    const anyHindi = voices.find((v) => v.lang.startsWith("hi"));
+    if (anyHindi) return anyHindi;
+    // Last fallback: koi bhi female voice
+    return voices.find((v) => /female|woman|girl|swara|kalpana/i.test(v.name)) ?? null;
+  };
+
+  // Speech end hone par state reset karo
+  const handleToggleSpeech = () => {
+    if (isSpeaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    if (!plant) return;
+
+    // ── HINDI me puri details build karo — har section ka title announce karo ──
+    const parts: string[] = [];
+
+    // परिचय — topic announce karo
+    parts.push(`नमस्ते! आज हम बात करेंगे औषधीय पौधे ${plant.name} के बारे में।`);
+
+    if (plant.hindiName) {
+      parts.push(`इस पौधे का हिंदी नाम है: ${plant.hindiName}.`);
+    }
+
+    parts.push(`इसका वैज्ञानिक नाम है: ${plant.scientificName}.`);
+
+    // पौधे के बारे में — section title
+    if (plant.about) {
+      parts.push(`पौधे के बारे में जानकारी। ${plant.about}`);
+    }
+
+    // औषधीय उपयोग — section title bolo
+    if (plant.medicinalUse && plant.medicinalUse.length > 0) {
+      parts.push(
+        `औषधीय उपयोग। इस पौधे का उपयोग ${plant.medicinalUse.join(", ")} में किया जाता है।`
+      );
+    }
+
+    // किन बीमारियों में फायदेमंद — section title bolo
+    if (plant.conditions && plant.conditions.length > 0) {
+      parts.push(
+        `यह पौधा किन बीमारियों में फायदेमंद है। ${plant.conditions.join(", ")}.`
+      );
+    }
+
+    // तैयारी का तरीका — section title bolo
+    if (plant.preparation) {
+      parts.push(`तैयारी का तरीका। ${plant.preparation}`);
+    }
+
+    // सावधानियाँ — section title bolo
+    if (plant.precautions) {
+      parts.push(`ज़रूरी सावधानियाँ। ${plant.precautions}`);
+    }
+
+    // मूल स्थान
+    if (plant.nativeLocation) {
+      parts.push(`यह पौधा मूल रूप से ${plant.nativeLocation} में पाया जाता है।`);
+    }
+
+    // प्राकृतिक वास
+    if (plant.habitat) {
+      parts.push(`इसका प्राकृतिक वास। ${plant.habitat}.`);
+    }
+
+    // आयुष प्रणाली
+    if (plant.ayushSystem && plant.ayushSystem.length > 0) {
+      parts.push(
+        `आयुष प्रणाली। यह पौधा ${plant.ayushSystem.join(", ")} में उपयोग होता है।`
+      );
+    }
+
+    parts.push(`यह थी ${plant.name} की पूरी जानकारी। धन्यवाद!`);
+
+    const textToRead = parts.join(" ");
+
+    const utterance   = new SpeechSynthesisUtterance(textToRead);
+    utterance.lang    = "hi-IN";
+    utterance.rate    = 0.88;  // thoda slow — clearly samajh aaye
+    utterance.pitch   = 1.2;  // female pitch — thoda upar
+    utterance.volume  = 1;
+
+    // Voices ready hone ke baad voice assign karo
+    const assignVoiceAndSpeak = () => {
+      const voice = getHindiFemaleVoice();
+      if (voice) utterance.voice = voice;
+      utterance.onend   = () => setIsSpeaking(false);
+      utterance.onerror = () => setIsSpeaking(false);
+      window.speechSynthesis.speak(utterance);
+      setIsSpeaking(true);
+    };
+
+    // Voices already loaded hain?
+    if (window.speechSynthesis.getVoices().length > 0) {
+      assignVoiceAndSpeak();
+    } else {
+      // Voices abhi load nahi hui — event wait karo (mostly first load par)
+      window.speechSynthesis.onvoiceschanged = () => {
+        window.speechSynthesis.onvoiceschanged = null;
+        assignVoiceAndSpeak();
+      };
+    }
+  };
+
   if (loading) return <LoadingSkeleton />;
 
   if (error) {
@@ -526,6 +690,8 @@ export default function PlantDetail() {
         isBookmarked={isBookmarked(plant.id)}
         onBookmark={() => toggleBookmark(plant.id)}
         onShare={handleShare}
+        isSpeaking={isSpeaking}
+        onToggleSpeech={handleToggleSpeech}
       />
 
       {/* ── TAB BAR ── */}
