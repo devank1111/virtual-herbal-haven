@@ -28,7 +28,7 @@ export default function HeroSection() {
             <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/20 backdrop-blur-sm border border-primary/30">
               <Leaf className="w-4 h-4 text-herb-light" />
               <span className="text-sm font-medium text-herb-light">
-                AYUSH Virtual Herbal Garden
+                AYUSH Nature Herbal Garden
               </span>
             </div>
           </motion.div>

@@ -11,9 +11,10 @@ export default function Footer() {
               <Leaf className="w-4 h-4 text-primary-foreground" />
             </div>
             <Link to="/admin-login">
-              <span className="font-display text-lg font-bold text-background">
-                AYUSH Garden
-              </span>
+             <span className="font-display text-lg font-bold text-background">
+            Nature
+            <p className="text-xs text-muted-foreground">organic & natural</p>
+          </span>
             </Link>
           </div>
 

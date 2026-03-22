@@ -1,13 +1,47 @@
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { plants } from "@/data/plants";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "@/firebase"; // apna firebase config path yahan
 import PlantCard from "../PlantsPortal/ExploreGarden/PlantCard";
 import { useBookmarks } from "@/hooks/useBookmarks";
 import { Link } from "react-router-dom";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Loader2 } from "lucide-react";
+
+// Plant ka type — apne actual fields ke hisaab se adjust karo
+interface Plant {
+  id: string;
+  name: string;
+  [key: string]: unknown;
+}
 
 export default function FeaturedPlants() {
   const { isBookmarked, toggleBookmark } = useBookmarks();
-  const featured = plants.slice(0, 4);
+  const [featured, setFeatured] = useState<Plant[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchPlants = async () => {
+      try {
+        setLoading(true);
+        const snapshot = await getDocs(collection(db, "plants"));
+        const allPlants = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as Plant[];
+
+        // Sirf pehle 4 plants featured section ke liye
+        setFeatured(allPlants.slice(0, 4));
+      } catch (err) {
+        console.error("Plants fetch error:", err);
+        setError("Plants load nahi ho sake. Dobara try karein.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPlants();
+  }, []);
 
   return (
     <section className="py-24 bg-background">
@@ -30,17 +64,34 @@ export default function FeaturedPlants() {
           </p>
         </motion.div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {featured.map((plant, i) => (
-            <PlantCard
-              key={plant.id}
-              plant={plant}
-              isBookmarked={isBookmarked(plant.id)}
-              onToggleBookmark={toggleBookmark}
-              index={i}
-            />
-          ))}
-        </div>
+        {/* Loading State */}
+        {loading && (
+          <div className="flex justify-center items-center py-20">
+            <Loader2 className="w-8 h-8 animate-spin text-accent" />
+          </div>
+        )}
+
+        {/* Error State */}
+        {error && !loading && (
+          <div className="text-center py-20 text-muted-foreground">
+            <p>{error}</p>
+          </div>
+        )}
+
+        {/* Plants Grid */}
+        {!loading && !error && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {featured.map((plant, i) => (
+              <PlantCard
+                key={plant.id}
+                plant={plant}
+                isBookmarked={isBookmarked(plant.id)}
+                onToggleBookmark={toggleBookmark}
+                index={i}
+              />
+            ))}
+          </div>
+        )}
 
         <motion.div
           initial={{ opacity: 0 }}

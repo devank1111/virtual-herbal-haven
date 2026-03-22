@@ -14,7 +14,6 @@ import {
   Leaf,
   Loader2,
   Globe,
-  Home,
   Hash,
   Languages,
   BookOpen,
@@ -32,21 +31,20 @@ import {
   serverTimestamp
 } from 'firebase/firestore';
 
-// Updated Plant interface with all new fields
+// ✅ Updated Plant interface — category is now string[]
 interface Plant {
   id: string;
   name: string;
   about: string;
   image: string;
-  medicinalUse: string[];          // changed from single string to array
+  medicinalUse: string[];
   nativeLocation: string;
   keyResearcher: string;
   precautions: string;
   researchPapers: string[];
-  // New fields
   scientificName: string;
   hindiName: string;
-  category: string;
+  category: string[];   // ✅ Changed from string to string[]
   city: string;
   state: string;
   lat?: number;
@@ -56,19 +54,19 @@ interface Plant {
   createdAt?: any;
 }
 
-// Initial form state includes all new fields
+// ✅ Updated initial form state — category is now array
 const INITIAL_FORM_STATE: Omit<Plant, 'id'> = {
   name: '',
   about: '',
   image: '',
-  medicinalUse: [''],               // array with one empty string
+  medicinalUse: [''],
   nativeLocation: '',
   keyResearcher: '',
   precautions: '',
   researchPapers: [''],
   scientificName: '',
   hindiName: '',
-  category: '',
+  category: [''],        // ✅ Array with one empty string
   city: '',
   state: '',
   lat: undefined,
@@ -101,11 +99,14 @@ export default function PlantDashboard() {
 
   const handleOpenModal = (plant?: Plant) => {
     if (plant) {
-      // Ensure arrays exist (for old documents that might not have them)
       setFormData({
         ...plant,
         medicinalUse: plant.medicinalUse?.length ? plant.medicinalUse : [''],
         researchPapers: plant.researchPapers?.length ? plant.researchPapers : [''],
+        // ✅ Handle old documents where category was a string
+        category: Array.isArray(plant.category)
+          ? (plant.category.length ? plant.category : [''])
+          : (plant.category ? [plant.category] : ['']),
       });
       setEditingId(plant.id);
     } else {
@@ -124,7 +125,6 @@ export default function PlantDashboard() {
   // Generic input change handler for text/textarea
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
-    // Handle number inputs (lat/lng)
     if (type === 'number') {
       setFormData({ ...formData, [name]: value === '' ? undefined : parseFloat(value) });
     } else {
@@ -132,10 +132,10 @@ export default function PlantDashboard() {
     }
   };
 
-  // Special handler for array fields (medicinalUse and researchPapers)
+  // ✅ Updated: now handles 'category' as well
   const handleArrayInputChange = (
     e: React.ChangeEvent<HTMLInputElement>,
-    field: 'medicinalUse' | 'researchPapers',
+    field: 'medicinalUse' | 'researchPapers' | 'category',
     index: number
   ) => {
     const updatedArray = [...formData[field]];
@@ -143,11 +143,13 @@ export default function PlantDashboard() {
     setFormData({ ...formData, [field]: updatedArray });
   };
 
-  const addArrayField = (field: 'medicinalUse' | 'researchPapers') => {
+  // ✅ Updated: now handles 'category' as well
+  const addArrayField = (field: 'medicinalUse' | 'researchPapers' | 'category') => {
     setFormData({ ...formData, [field]: [...formData[field], ''] });
   };
 
-  const removeArrayField = (field: 'medicinalUse' | 'researchPapers', index: number) => {
+  // ✅ Updated: now handles 'category' as well
+  const removeArrayField = (field: 'medicinalUse' | 'researchPapers' | 'category', index: number) => {
     const updatedArray = formData[field].filter((_, i) => i !== index);
     setFormData({ ...formData, [field]: updatedArray });
   };
@@ -157,23 +159,23 @@ export default function PlantDashboard() {
     setIsSubmitting(true);
 
     try {
-      // Filter out empty strings from arrays
+      // ✅ Filter empty strings from all three arrays
       const filteredMedicinalUse = formData.medicinalUse.filter(item => item.trim() !== '');
       const filteredResearchPapers = formData.researchPapers.filter(item => item.trim() !== '');
+      const filteredCategory = formData.category.filter(item => item.trim() !== '');
 
       const plantData = {
         ...formData,
         medicinalUse: filteredMedicinalUse,
         researchPapers: filteredResearchPapers,
+        category: filteredCategory,   // ✅ Store as array in Firestore
         updatedAt: serverTimestamp(),
       };
 
       if (editingId) {
-        // Update existing document
         const plantRef = doc(db, 'plants', editingId);
         await updateDoc(plantRef, plantData);
       } else {
-        // Add new document
         await addDoc(collection(db, 'plants'), {
           ...plantData,
           createdAt: serverTimestamp(),
@@ -209,7 +211,9 @@ export default function PlantDashboard() {
             <div className="w-10 h-10 bg-[oklch(35%_0.05_150)] rounded-xl flex items-center justify-center text-white">
               <Leaf size={20} />
             </div>
-            <h1 className="text-xl font-bold tracking-tight uppercase">Nature   <span className="font-bold opacity-50">Garden</span></h1>
+            <h1 className="text-xl font-bold tracking-tight uppercase">
+              Nature <span className="font-bold opacity-50">Garden</span>
+            </h1>
           </div>
           <button
             onClick={() => handleOpenModal()}
@@ -228,7 +232,12 @@ export default function PlantDashboard() {
               <Search size={24} />
             </div>
             <p className="text-lg font-medium opacity-60">No specimens cataloged yet.</p>
-            <button onClick={() => handleOpenModal()} className="mt-4 text-[oklch(35%_0.05_150)] font-semibold underline underline-offset-4">Begin first entry</button>
+            <button
+              onClick={() => handleOpenModal()}
+              className="mt-4 text-[oklch(35%_0.05_150)] font-semibold underline underline-offset-4"
+            >
+              Begin first entry
+            </button>
           </div>
         )}
 
@@ -245,24 +254,36 @@ export default function PlantDashboard() {
               >
                 <div className="aspect-[4/3] bg-[oklch(95%_0.01_160)] relative overflow-hidden">
                   {plant.image ? (
-                    <img src={plant.image} alt={plant.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                    <img
+                      src={plant.image}
+                      alt={plant.name}
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-[oklch(80%_0.01_160)]">
                       <Leaf size={48} strokeWidth={1} />
                     </div>
                   )}
                   <div className="absolute top-4 right-4 flex gap-2 translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all">
-                    <button onClick={() => handleOpenModal(plant)} className="p-2 bg-white rounded-full shadow-md hover:text-blue-600 transition-colors">
+                    <button
+                      onClick={() => handleOpenModal(plant)}
+                      className="p-2 bg-white rounded-full shadow-md hover:text-blue-600 transition-colors"
+                    >
                       <Edit3 size={16} />
                     </button>
-                    <button onClick={() => deletePlant(plant.id)} className="p-2 bg-white rounded-full shadow-md hover:text-red-600 transition-colors">
+                    <button
+                      onClick={() => deletePlant(plant.id)}
+                      className="p-2 bg-white rounded-full shadow-md hover:text-red-600 transition-colors"
+                    >
                       <Trash2 size={16} />
                     </button>
                   </div>
                 </div>
                 <div className="p-6">
                   <h3 className="text-2xl font-serif font-bold mb-2">{plant.name}</h3>
-                  <p className="text-sm text-[oklch(50%_0.01_160)] line-clamp-2 mb-4 leading-relaxed">{plant.about}</p>
+                  <p className="text-sm text-[oklch(50%_0.01_160)] line-clamp-2 mb-4 leading-relaxed">
+                    {plant.about}
+                  </p>
                   <div className="flex flex-wrap gap-2">
                     {plant.nativeLocation && (
                       <span className="px-3 py-1 bg-[oklch(95%_0.01_160)] rounded-full text-[10px] uppercase tracking-widest font-bold flex items-center gap-1.5">
@@ -272,12 +293,15 @@ export default function PlantDashboard() {
                     <span className="px-3 py-1 bg-[oklch(95%_0.01_160)] rounded-full text-[10px] uppercase tracking-widest font-bold flex items-center gap-1.5">
                       <FileText size={10} /> {plant.researchPapers?.length || 0} Papers
                     </span>
-                    {/* Optional: show category if exists */}
-                    {plant.category && (
-                      <span className="px-3 py-1 bg-[oklch(95%_0.01_160)] rounded-full text-[10px] uppercase tracking-widest font-bold">
-                        {plant.category}
+                    {/* ✅ Show all categories as individual badges */}
+                    {Array.isArray(plant.category) && plant.category.map((cat, i) => (
+                      <span
+                        key={i}
+                        className="px-3 py-1 bg-[oklch(92%_0.03_150)] text-[oklch(30%_0.05_150)] rounded-full text-[10px] uppercase tracking-widest font-bold flex items-center gap-1.5"
+                      >
+                        <Hash size={10} /> {cat}
                       </span>
-                    )}
+                    ))}
                   </div>
                 </div>
               </motion.div>
@@ -305,15 +329,21 @@ export default function PlantDashboard() {
             >
               <div className="p-8 border-b border-[oklch(90%_0.01_160)] flex justify-between items-center">
                 <div>
-                  <h2 className="text-2xl font-serif font-bold">{editingId ? 'Edit Specimen' : 'New Catalog Entry'}</h2>
+                  <h2 className="text-2xl font-serif font-bold">
+                    {editingId ? 'Edit Specimen' : 'New Catalog Entry'}
+                  </h2>
                   <p className="text-sm opacity-50">Fill in the botanical details below</p>
                 </div>
-                <button onClick={handleCloseModal} className="p-2 hover:bg-[oklch(95%_0.01_160)] rounded-full transition-colors">
+                <button
+                  onClick={handleCloseModal}
+                  className="p-2 hover:bg-[oklch(95%_0.01_160)] rounded-full transition-colors"
+                >
                   <X size={24} />
                 </button>
               </div>
 
               <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-8 space-y-8">
+
                 {/* Row 1: Basic names */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="space-y-2">
@@ -355,32 +385,55 @@ export default function PlantDashboard() {
                   </div>
                 </div>
 
-                {/* Row 2: Category & Habitat */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
+                {/* ✅ Category (Dynamic Array) — same pattern as medicinalUse */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
                     <label className="text-[10px] uppercase tracking-widest font-bold opacity-50 flex items-center gap-2">
-                      <Hash size={12} /> Category
+                      <Hash size={12} /> Categories
                     </label>
-                    <input
-                      name="category"
-                      value={formData.category}
-                      onChange={handleInputChange}
-                      className="w-full px-4 py-3 bg-[oklch(98%_0.01_160)] border border-[oklch(90%_0.01_160)] rounded-xl focus:ring-2 ring-[oklch(35%_0.05_150/0.2)] outline-none transition-all"
-                      placeholder="e.g. Succulent, Herb, Tree"
-                    />
+                    <button
+                      type="button"
+                      onClick={() => addArrayField('category')}
+                      className="text-xs font-bold text-[oklch(35%_0.05_150)] flex items-center gap-1 hover:opacity-70"
+                    >
+                      <PlusCircle size={14} /> Add Category
+                    </button>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] uppercase tracking-widest font-bold opacity-50 flex items-center gap-2">
-                      <Droplets size={12} /> Habitat
-                    </label>
-                    <input
-                      name="habitat"
-                      value={formData.habitat}
-                      onChange={handleInputChange}
-                      className="w-full px-4 py-3 bg-[oklch(98%_0.01_160)] border border-[oklch(90%_0.01_160)] rounded-xl focus:ring-2 ring-[oklch(35%_0.05_150/0.2)] outline-none transition-all"
-                      placeholder="Tropical, Arid, etc."
-                    />
+                  <div className="space-y-3">
+                    {formData.category.map((cat, index) => (
+                      <div key={index} className="flex gap-2">
+                        <input
+                          value={cat}
+                          onChange={(e) => handleArrayInputChange(e, 'category', index)}
+                          className="flex-1 px-4 py-3 bg-[oklch(98%_0.01_160)] border border-[oklch(90%_0.01_160)] rounded-xl focus:ring-2 ring-[oklch(35%_0.05_150/0.2)] outline-none transition-all"
+                          placeholder="e.g. Succulent, Herb, Tree, Ayurvedic"
+                        />
+                        {formData.category.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeArrayField('category', index)}
+                            className="p-3 text-red-400 hover:bg-red-50 rounded-xl transition-colors"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
                   </div>
+                </div>
+
+                {/* Habitat */}
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest font-bold opacity-50 flex items-center gap-2">
+                    <Droplets size={12} /> Habitat
+                  </label>
+                  <input
+                    name="habitat"
+                    value={formData.habitat}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 bg-[oklch(98%_0.01_160)] border border-[oklch(90%_0.01_160)] rounded-xl focus:ring-2 ring-[oklch(35%_0.05_150/0.2)] outline-none transition-all"
+                    placeholder="Tropical, Arid, etc."
+                  />
                 </div>
 
                 {/* About the plant */}
@@ -396,7 +449,7 @@ export default function PlantDashboard() {
                   />
                 </div>
 
-                {/* Location details: nativeLocation + city/state + lat/lng */}
+                {/* Location */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <label className="text-[10px] uppercase tracking-widest font-bold opacity-50 flex items-center gap-2">
@@ -486,7 +539,7 @@ export default function PlantDashboard() {
                   </div>
                 </div>
 
-                {/* Preparation (new textarea) */}
+                {/* Preparation */}
                 <div className="space-y-2">
                   <label className="text-[10px] uppercase tracking-widest font-bold opacity-50">Preparation / Usage Method</label>
                   <textarea

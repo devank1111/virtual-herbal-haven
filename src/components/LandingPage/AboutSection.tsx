@@ -36,7 +36,7 @@ export default function AboutSection() {
             transition={{ duration: 0.6 }}
           >
             <span className="text-sm font-semibold uppercase tracking-widest text-accent">
-              About AYUSH Garden
+              About Nature Garden
             </span>
             <h2 className="font-display text-3xl sm:text-4xl font-bold text-foreground mt-2 mb-6">
               Bridging Traditional Wisdom with Modern Technology

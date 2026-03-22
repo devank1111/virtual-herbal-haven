@@ -1,18 +1,110 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, ArrowRight, Leaf, Info } from "lucide-react";
-import { plants } from "@/data/plants";
+import { ArrowLeft, ArrowRight, Leaf, Info, Loader2 } from "lucide-react";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "@/firebase";
 import { Link } from "react-router-dom";
 import Header from "@/components/NavFoot/Header";
 import Footer from "@/components/NavFoot/Footer";
 
+interface Plant {
+  id: string;
+  name: string;
+  scientificName: string;
+  hindiName: string;
+  description: string;
+  image: string;
+  category: string[];
+  medicinalUse: string[]; // Firebase mein "medicinalUse" hai
+}
+
 export default function VirtualTour() {
+  const [plants, setPlants] = useState<Plant[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchPlants = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, "plants"));
+        const fetchedPlants: Plant[] = querySnapshot.docs.map((doc) => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            ...data,
+            category: Array.isArray(data.category)
+              ? data.category
+              : data.category
+              ? [data.category]
+              : [],
+            // Firebase field name: "medicinalUse" (array)
+            medicinalUse: Array.isArray(data.medicinalUse)
+              ? data.medicinalUse
+              : data.medicinalUse
+              ? [data.medicinalUse]
+              : [],
+          };
+        }) as Plant[];
+        setPlants(fetchedPlants);
+      } catch (err) {
+        console.error("Firebase fetch error:", err);
+        setError("Plants load karne mein problem aayi. Dobara try karo.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPlants();
+  }, []);
+
   const plant = plants[currentIndex];
 
   const goNext = () => setCurrentIndex((prev) => (prev + 1) % plants.length);
   const goPrev = () =>
     setCurrentIndex((prev) => (prev - 1 + plants.length) % plants.length);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="pt-20 pb-16 flex items-center justify-center min-h-[60vh]">
+          <div className="flex flex-col items-center gap-4 text-muted-foreground">
+            <Loader2 className="w-10 h-10 animate-spin text-primary" />
+            <p className="text-sm font-medium">Garden load ho raha hai...</p>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="pt-20 pb-16 flex items-center justify-center min-h-[60vh]">
+          <div className="text-center text-destructive space-y-2">
+            <p className="text-lg font-semibold">Kuch galat ho gaya!</p>
+            <p className="text-sm text-muted-foreground">{error}</p>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (plants.length === 0) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="pt-20 pb-16 flex items-center justify-center min-h-[60vh]">
+          <p className="text-muted-foreground">Koi plant nahi mila Firebase mein.</p>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -39,7 +131,7 @@ export default function VirtualTour() {
           </motion.div>
         </div>
 
-        {/* Tour viewer */}
+        {/* Tour Viewer */}
         <div className="container mx-auto px-4">
           <div className="max-w-5xl mx-auto">
             <motion.div
@@ -48,26 +140,25 @@ export default function VirtualTour() {
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.4 }}
               className="grid lg:grid-cols-2 gap-0 rounded-2xl overflow-hidden shadow-botanical-lg botanical-border bg-card"
+              style={{ height: "460px" }}
             >
-              {/* Image */}
-              <div className="relative aspect-square lg:aspect-auto overflow-hidden">
+              {/* Image — position absolute so it never changes card height */}
+              <div className="relative overflow-hidden">
                 <img
                   src={plant.image}
                   alt={`${plant.name} - ${plant.scientificName}`}
-                  className="w-full h-full object-cover"
+                  className="absolute inset-0 w-full h-full object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-foreground/40 via-transparent to-transparent lg:bg-gradient-to-r" />
-
-                {/* Counter */}
                 <div className="absolute top-4 left-4 px-3 py-1 rounded-full bg-background/80 backdrop-blur-sm text-sm font-medium text-foreground">
                   {currentIndex + 1} / {plants.length}
                 </div>
               </div>
 
               {/* Info */}
-              <div className="p-8 lg:p-10 flex flex-col justify-center">
+              <div className="p-8 lg:p-10 flex flex-col justify-center overflow-y-auto">
                 <div className="flex flex-wrap gap-2 mb-4">
-                  {plant.category.map((cat) => (
+                  {plant.category?.map((cat) => (
                     <span
                       key={cat}
                       className="text-[10px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-full bg-primary/10 text-primary"
@@ -84,7 +175,7 @@ export default function VirtualTour() {
                   {plant.scientificName} • {plant.hindiName}
                 </p>
 
-                <p className="text-muted-foreground leading-relaxed mb-6">
+                <p className="text-muted-foreground leading-relaxed mb-6 line-clamp-3">
                   {plant.description}
                 </p>
 
@@ -93,8 +184,12 @@ export default function VirtualTour() {
                     Key Uses
                   </h3>
                   <ul className="space-y-1.5">
-                    {plant.medicinalUses.slice(0, 3).map((use, i) => (
-                      <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
+                    {/* Firebase "medicinalUse" — sirf pehle 3 */}
+                    {plant.medicinalUse?.slice(0, 3).map((use, i) => (
+                      <li
+                        key={i}
+                        className="flex items-start gap-2 text-sm text-muted-foreground"
+                      >
                         <span className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 flex-shrink-0" />
                         {use}
                       </li>
@@ -124,7 +219,6 @@ export default function VirtualTour() {
                 Previous
               </button>
 
-              {/* Dots */}
               <div className="hidden sm:flex items-center gap-1.5">
                 {plants.map((_, i) => (
                   <button

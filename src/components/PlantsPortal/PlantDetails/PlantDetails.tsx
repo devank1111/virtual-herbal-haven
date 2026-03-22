@@ -1,11 +1,11 @@
 import { useParams, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { useState } from "react";
-import { plants } from "@/data/plants";
+import { useState, useEffect } from "react";
+import { db } from "@/firebase";
+import { doc, getDoc } from "firebase/firestore";
 import { useBookmarks } from "@/hooks/useBookmarks";
 import Header from "@/components/NavFoot/Header";
 import Footer from "@/components/NavFoot/Footer";
-import PlantVideos from "@/components/PlantsPortal/PlantDetails/PlantVideos";
 import {
   ArrowLeft,
   Bookmark,
@@ -19,8 +19,121 @@ import {
   Leaf,
   HeartPulse,
   BookOpen,
+  Utensils,
 } from "lucide-react";
-import type { Plant } from "@/data/plants";
+
+// ─────────────────────────────────────────────────────────────
+// TYPE — Firebase ke actual field names ke according
+// ─────────────────────────────────────────────────────────────
+export interface Plant {
+  id: string;
+  name: string;
+  scientificName: string;
+  hindiName?: string;
+  about?: string;             // Firebase: "about"
+  image: string;
+  category: string;           // Firebase: single string e.g. "Medicinal desert shrub"
+  medicinalUse?: string[];    // Firebase: "medicinalUse" array
+  conditions?: string[];
+  ayushSystem?: string[];
+  nativeLocation?: string;
+  habitat?: string;
+  keyResearcher?: string;     // Firebase: "keyResearcher"
+  precautions?: string;
+  preparation?: string;       // Firebase: "preparation"
+  researchPapers?: string[];  // Firebase: array of URL strings
+  city?: string;
+  state?: string;
+  lat?: number;
+  lng?: number;
+}
+
+// ─────────────────────────────────────────────────────────────
+// NORMALIZER
+// ─────────────────────────────────────────────────────────────
+function toStringArray(val: unknown): string[] {
+  if (Array.isArray(val)) return val.filter((v) => typeof v === "string");
+  if (typeof val === "string" && val.trim()) return val.split(",").map((s) => s.trim());
+  return [];
+}
+
+function normalizePlant(id: string, data: Record<string, unknown>): Plant {
+  return {
+    id,
+    name:           (data.name as string) ?? "",
+    scientificName: (data.scientificName as string) ?? "",
+    hindiName:      (data.hindiName as string) ?? undefined,
+    about:          (data.about as string) ?? undefined,
+    image:          (data.image as string) ?? "",
+    category:       typeof data.category === "string" ? data.category : "",
+    medicinalUse:   toStringArray(data.medicinalUse),
+    conditions:     toStringArray(data.conditions),
+    ayushSystem:    toStringArray(data.ayushSystem),
+    nativeLocation: (data.nativeLocation as string) ?? undefined,
+    habitat:        (data.habitat as string) ?? undefined,
+    keyResearcher:  (data.keyResearcher as string) ?? undefined,
+    precautions:    (data.precautions as string) ?? undefined,
+    preparation:    (data.preparation as string) ?? undefined,
+    researchPapers: toStringArray(data.researchPapers),
+    city:           (data.city as string) ?? undefined,
+    state:          (data.state as string) ?? undefined,
+    lat:            (data.lat as number) ?? undefined,
+    lng:            (data.lng as number) ?? undefined,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────
+// FIREBASE FETCH HOOK
+// ─────────────────────────────────────────────────────────────
+function usePlantById(id: string | undefined) {
+  const [plant, setPlant]     = useState<Plant | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!id) { setLoading(false); return; }
+    async function fetchPlant() {
+      try {
+        setLoading(true);
+        setError(null);
+        const docRef  = doc(db, "plants", id);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          setPlant(normalizePlant(docSnap.id, docSnap.data() as Record<string, unknown>));
+        } else {
+          setPlant(null);
+        }
+      } catch (err) {
+        console.error("Firebase fetch error:", err);
+        setError("Failed to load plant data.");
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchPlant();
+  }, [id]);
+
+  return { plant, loading, error };
+}
+
+// ─────────────────────────────────────────────────────────────
+// LOADING SKELETON
+// ─────────────────────────────────────────────────────────────
+function LoadingSkeleton() {
+  return (
+    <div className="min-h-screen flex flex-col bg-[#f4f7f2]">
+      <Header />
+      <div className="relative h-[52vh] min-h-[380px] bg-gray-200 animate-pulse" />
+      <div className="max-w-5xl mx-auto w-full px-6 pt-6 space-y-4 pb-14">
+        <div className="h-12 bg-white rounded-2xl border border-gray-100 animate-pulse" />
+        <div className="h-40 bg-white rounded-2xl border border-gray-100 animate-pulse" />
+        <div className="h-32 bg-white rounded-2xl border border-gray-100 animate-pulse" />
+        <div className="h-24 bg-white rounded-2xl border border-gray-100 animate-pulse" />
+      </div>
+      <Footer />
+    </div>
+  );
+}
 
 // ─────────────────────────────────────────────────────────────
 // HERO
@@ -36,6 +149,11 @@ function PlantDetailHero({
   onBookmark: () => void;
   onShare: () => void;
 }) {
+  // category is a plain string in Firebase — split by comma for multiple badges
+  const categories = plant.category
+    ? plant.category.split(",").map((c) => c.trim()).filter(Boolean)
+    : [];
+
   return (
     <div className="relative h-[52vh] min-h-[380px] overflow-hidden">
       <img
@@ -85,24 +203,31 @@ function PlantDetailHero({
         transition={{ duration: 0.5, ease: "easeOut" }}
         className="absolute bottom-0 left-0 right-0 max-w-5xl mx-auto px-6 pb-8"
       >
-        <div className="flex flex-wrap gap-1.5 mb-3">
-          {plant.category.map((cat: string) => (
-            <span
-              key={cat}
-              className="text-[10px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-green-500/20 border border-green-400/30 text-green-200 backdrop-blur-sm"
-            >
-              {cat}
-            </span>
-          ))}
-        </div>
+        {categories.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {categories.map((cat) => (
+              <span
+                key={cat}
+                className="text-[10px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-green-500/20 border border-green-400/30 text-green-200 backdrop-blur-sm"
+              >
+                {cat}
+              </span>
+            ))}
+          </div>
+        )}
         <h1 className="text-[2.6rem] sm:text-5xl font-bold text-white leading-none tracking-tight mb-1.5">
           {plant.name}
         </h1>
         <p className="text-[15px] italic text-white/55 font-light">
           {plant.scientificName}
-          {plant.hindiName ? (
+          {plant.hindiName && (
             <span className="not-italic text-white/40"> · {plant.hindiName}</span>
-          ) : null}
+          )}
+          {(plant.city || plant.state) && (
+            <span className="not-italic text-white/35">
+              {" "}· {[plant.city, plant.state].filter(Boolean).join(", ")}
+            </span>
+          )}
         </p>
       </motion.div>
     </div>
@@ -117,17 +242,16 @@ function Chip({
   variant = "neutral",
 }: {
   label: string;
-  variant?: "green" | "rose" | "neutral";
+  variant?: "green" | "rose" | "amber" | "neutral";
 }) {
   const cls = {
     green:   "bg-green-50  text-green-800  border-green-100",
     rose:    "bg-rose-50   text-rose-700   border-rose-100",
+    amber:   "bg-amber-50  text-amber-700  border-amber-100",
     neutral: "bg-gray-50   text-gray-700   border-gray-200",
   }[variant];
   return (
-    <span
-      className={`inline-flex px-3 py-1 rounded-full text-[13px] font-medium border ${cls}`}
-    >
+    <span className={`inline-flex px-3 py-1 rounded-full text-[13px] font-medium border ${cls}`}>
       {label}
     </span>
   );
@@ -142,7 +266,7 @@ function InfoRow({
   icon: React.ElementType;
   label: string;
   value?: string | null;
-  accent?: "sky" | "green" | "violet" | "rose";
+  accent?: "sky" | "green" | "violet" | "rose" | "amber";
 }) {
   if (!value) return null;
   const accentCls = {
@@ -150,19 +274,16 @@ function InfoRow({
     green:  "bg-green-50  text-green-700",
     violet: "bg-violet-50 text-violet-600",
     rose:   "bg-rose-50   text-rose-500",
+    amber:  "bg-amber-50  text-amber-600",
   }[accent];
   return (
     <div className="flex items-start gap-3.5 py-4 border-b border-gray-100 last:border-0">
-      <div
-        className={`mt-0.5 w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${accentCls}`}
-      >
+      <div className={`mt-0.5 w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${accentCls}`}>
         <Icon className="w-4 h-4" />
       </div>
       <div className="min-w-0">
-        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">
-          {label}
-        </p>
-        <p className="text-[14.5px] text-gray-700 leading-relaxed">{value}</p>
+        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">{label}</p>
+        <p className="text-[14.5px] text-gray-700 leading-relaxed whitespace-pre-line">{value}</p>
       </div>
     </div>
   );
@@ -174,17 +295,15 @@ function InfoRow({
 function OverviewTab({ plant }: { plant: Plant }) {
   return (
     <div className="space-y-4">
-      {/* About */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-3">
-          About
-        </p>
-        <p className="text-gray-700 leading-[1.8] text-[15px]">{plant.description}</p>
-      </div>
+      {plant.about && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-3">About</p>
+          <p className="text-gray-700 leading-[1.8] text-[15px]">{plant.about}</p>
+        </div>
+      )}
 
-      {/* Medicinal uses + Conditions */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {plant.medicinalUses && plant.medicinalUses.length > 0 && (
+        {plant.medicinalUse && plant.medicinalUse.length > 0 && (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
             <div className="flex items-center gap-2 mb-4">
               <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center">
@@ -195,7 +314,7 @@ function OverviewTab({ plant }: { plant: Plant }) {
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              {plant.medicinalUses.map((use: string) => (
+              {plant.medicinalUse.map((use) => (
                 <Chip key={use} label={use} variant="green" />
               ))}
             </div>
@@ -213,7 +332,7 @@ function OverviewTab({ plant }: { plant: Plant }) {
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              {plant.conditions.map((c: string) => (
+              {plant.conditions.map((c) => (
                 <Chip key={c} label={c} variant="rose" />
               ))}
             </div>
@@ -221,22 +340,21 @@ function OverviewTab({ plant }: { plant: Plant }) {
         )}
       </div>
 
-      {/* Details rows */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-6 py-2">
         <InfoRow icon={Globe}         label="Native Location" value={plant.nativeLocation} accent="sky"    />
         <InfoRow icon={MapPin}        label="Habitat"         value={plant.habitat}         accent="green"  />
-        <InfoRow icon={User}          label="Key Researcher"  value={plant.researcher}      accent="violet" />
+        <InfoRow icon={User}          label="Key Researcher"  value={plant.keyResearcher}   accent="violet" />
         <InfoRow icon={AlertTriangle} label="Precautions"     value={plant.precautions}     accent="rose"   />
+        <InfoRow icon={Utensils}      label="Preparation"     value={plant.preparation}     accent="amber"  />
       </div>
 
-      {/* AYUSH systems */}
       {plant.ayushSystem && plant.ayushSystem.length > 0 && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
           <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-3">
             AYUSH Systems
           </p>
           <div className="flex flex-wrap gap-2">
-            {plant.ayushSystem.map((s: string) => (
+            {plant.ayushSystem.map((s) => (
               <span
                 key={s}
                 className="px-3 py-1 rounded-full text-[13px] font-semibold bg-green-100 text-green-800 border border-green-200"
@@ -259,16 +377,10 @@ function ModelTab({ plant }: { plant: Plant }) {
     <div className="space-y-4">
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="px-6 py-5 border-b border-gray-100 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center text-base">
-            👁
-          </div>
+          <div className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center text-base">👁</div>
           <div>
-            <h2 className="text-[15px] font-bold text-gray-800">
-              3D Model — {plant.name}
-            </h2>
-            <p className="text-[13px] text-gray-400 mt-0.5">
-              Rotate and explore interactively
-            </p>
+            <h2 className="text-[15px] font-bold text-gray-800">3D Model — {plant.name}</h2>
+            <p className="text-[13px] text-gray-400 mt-0.5">Rotate and explore interactively</p>
           </div>
         </div>
         <div className="w-full h-[480px] bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 flex items-center justify-center">
@@ -278,104 +390,69 @@ function ModelTab({ plant }: { plant: Plant }) {
           </div>
         </div>
       </div>
-
-      {/* <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-4">
-          Related Videos
-        </p>
-        <PlantVideos plant={plant} />
-      </div> */}
     </div>
   );
 }
 
 // ─────────────────────────────────────────────────────────────
-// RESEARCH TAB
+// RESEARCH TAB — researchPapers is array of URL strings
 // ─────────────────────────────────────────────────────────────
 function ResearchTab({ plant }: { plant: Plant }) {
-  const hasRefs = plant.references && plant.references.length > 0;
+  const papers = plant.researchPapers ?? [];
 
   return (
     <div className="space-y-4">
-      {/* header card */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-6 py-5 flex items-center gap-3">
         <div className="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center">
           <FlaskConical className="w-4 h-4 text-amber-500" />
         </div>
         <div>
-          <h2 className="text-[15px] font-bold text-gray-800">
-            Research &amp; References
-          </h2>
-          <p className="text-[13px] text-gray-400 mt-0.5">
-            Scientific studies for {plant.name}
-          </p>
+          <h2 className="text-[15px] font-bold text-gray-800">Research &amp; References</h2>
+          <p className="text-[13px] text-gray-400 mt-0.5">Scientific studies for {plant.name}</p>
         </div>
       </div>
 
-      {hasRefs ? (
+      {papers.length > 0 ? (
         <div className="space-y-3">
-          {plant.references.map(
-            (
-              ref: {
-                title: string;
-                authors?: string;
-                journal?: string;
-                year?: number;
-                url?: string;
-                link?: string;
-              },
-              idx: number
-            ) => (
+          {papers.map((url, idx) => {
+            let domain = url;
+            try { domain = new URL(url).hostname.replace("www.", ""); } catch {}
+            return (
               <motion.div
                 key={idx}
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.04 }}
-                className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex gap-4 items-start hover:border-green-200 hover:shadow-md transition-all duration-200"
+                className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex gap-4 items-center hover:border-green-200 hover:shadow-md transition-all duration-200"
               >
                 <div className="flex-shrink-0 w-8 h-8 rounded-full bg-green-100 text-green-800 text-xs font-bold flex items-center justify-center">
                   {idx + 1}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-gray-800 font-semibold text-[14.5px] leading-snug">
-                    {ref.title}
+                  <p className="text-gray-500 text-[12px] mb-0.5 uppercase tracking-wide font-semibold">
+                    {domain}
                   </p>
-                  {ref.authors && (
-                    <p className="text-gray-500 text-[13px] mt-1">{ref.authors}</p>
-                  )}
-                  {(ref.journal || ref.year) && (
-                    <p className="text-gray-400 text-[13px] italic mt-0.5">
-                      {ref.journal}
-                      {ref.journal && ref.year ? ", " : ""}
-                      {ref.year}
-                    </p>
-                  )}
-                  {(ref.url || ref.link) && (
-                    <a
-                      href={ref.url ?? ref.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-green-600 hover:text-green-800 text-[13px] mt-2 font-semibold transition-colors"
-                    >
-                      <BookOpen className="w-3.5 h-3.5" />
-                      View Paper
-                      <ExternalLink className="w-3 h-3 opacity-60" />
-                    </a>
-                  )}
+                  <p className="text-gray-600 text-[13px] truncate">{url}</p>
                 </div>
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-shrink-0 flex items-center gap-1.5 text-green-600 hover:text-green-800 text-[13px] font-semibold transition-colors whitespace-nowrap"
+                >
+                  <BookOpen className="w-3.5 h-3.5" />
+                  View
+                  <ExternalLink className="w-3 h-3 opacity-60" />
+                </a>
               </motion.div>
-            )
-          )}
+            );
+          })}
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm py-16 text-center">
           <p className="text-4xl mb-3">📄</p>
-          <p className="text-gray-600 font-semibold text-[15px]">
-            No references available yet
-          </p>
-          <p className="text-gray-400 text-sm mt-1">
-            We're expanding our database — check back soon.
-          </p>
+          <p className="text-gray-600 font-semibold text-[15px]">No references available yet</p>
+          <p className="text-gray-400 text-sm mt-1">We're expanding our database — check back soon.</p>
         </div>
       )}
     </div>
@@ -398,19 +475,30 @@ type TabId = (typeof TABS)[number]["id"];
 // ─────────────────────────────────────────────────────────────
 export default function PlantDetail() {
   const { id } = useParams<{ id: string }>();
-  const plant = plants.find((p) => p.id === id);
+  const { plant, loading, error } = usePlantById(id);
   const { isBookmarked, toggleBookmark } = useBookmarks();
   const [activeTab, setActiveTab] = useState<TabId>("overview");
+
+  if (loading) return <LoadingSkeleton />;
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[#f4f7f2]">
+        <span className="text-5xl">⚠️</span>
+        <p className="text-xl font-semibold text-gray-500">{error}</p>
+        <Link to="/garden" className="flex items-center gap-2 text-green-700 hover:text-green-900 font-medium text-sm">
+          <ArrowLeft className="w-4 h-4" /> Back to Garden
+        </Link>
+      </div>
+    );
+  }
 
   if (!plant) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[#f4f7f2]">
         <span className="text-5xl">🌾</span>
         <p className="text-xl font-semibold text-gray-500">Plant not found</p>
-        <Link
-          to="/garden"
-          className="flex items-center gap-2 text-green-700 hover:text-green-900 font-medium text-sm transition-colors"
-        >
+        <Link to="/garden" className="flex items-center gap-2 text-green-700 hover:text-green-900 font-medium text-sm">
           <ArrowLeft className="w-4 h-4" /> Back to Garden
         </Link>
       </div>
@@ -448,9 +536,7 @@ export default function PlantDetail() {
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`relative flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-[13.5px] font-semibold transition-all duration-200 ${
-                activeTab === tab.id
-                  ? "text-green-800"
-                  : "text-gray-400 hover:text-gray-600"
+                activeTab === tab.id ? "text-green-800" : "text-gray-400 hover:text-gray-600"
               }`}
             >
               {activeTab === tab.id && (
