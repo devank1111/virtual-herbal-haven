@@ -31,6 +31,16 @@ import {
   serverTimestamp
 } from 'firebase/firestore';
 
+interface QuizQuestion {
+  question: string;
+  answerType: 'single' | 'multiple';
+  options: string[];
+  correctAnswers: number[];
+  points: number;         // right answer pe kitne points
+  negativePoints: number; // wrong answer pe kitne minus
+  isBonus: boolean;       // bonus question ya nahi
+}
+
 // ✅ Updated Plant interface — category is now string[]
 interface Plant {
   id: string;
@@ -51,8 +61,19 @@ interface Plant {
   lng?: number;
   habitat: string;
   preparation: string;
+  quizQuestions?: QuizQuestion[];
   createdAt?: any;
 }
+
+const INITIAL_QUESTION: QuizQuestion = {
+  question: '',
+  answerType: 'single',
+  options: ['', '', '', ''],
+  correctAnswers: [],
+  points: 5,
+  negativePoints: 0,
+  isBonus: false,
+};
 
 // ✅ Updated initial form state — category is now array
 const INITIAL_FORM_STATE: Omit<Plant, 'id'> = {
@@ -73,6 +94,7 @@ const INITIAL_FORM_STATE: Omit<Plant, 'id'> = {
   lng: undefined,
   habitat: '',
   preparation: '',
+  quizQuestions: [INITIAL_QUESTION],
 };
 
 export default function PlantDashboard() {
@@ -154,6 +176,86 @@ export default function PlantDashboard() {
     setFormData({ ...formData, [field]: updatedArray });
   };
 
+  // ✅ YAHAN SE quiz functions add karne hain
+const addQuestion = () => {
+  setFormData({
+    ...formData,
+    quizQuestions: [
+      ...(formData.quizQuestions || []),
+      {
+  question: '',
+  answerType: 'single',
+  options: ['', '', '', ''],
+  correctAnswers: [],
+  points: 5,
+  negativePoints: 0,
+  isBonus: false,
+}
+    ],
+  });
+};
+
+
+const removeQuestion = (qIndex: number) => {
+  const updatedQuestions = (formData.quizQuestions || []).filter((_, i) => i !== qIndex);
+  setFormData({ ...formData, quizQuestions: updatedQuestions });
+};
+
+const handleQuestionChange = (qIndex: number, value: string) => {
+  const updatedQuestions = [...(formData.quizQuestions || [])];
+  updatedQuestions[qIndex].question = value;
+  setFormData({ ...formData, quizQuestions: updatedQuestions });
+};
+
+const handleOptionChange = (qIndex: number, optIndex: number, value: string) => {
+  const updatedQuestions = [...(formData.quizQuestions || [])];
+  updatedQuestions[qIndex].options[optIndex] = value;
+  setFormData({ ...formData, quizQuestions: updatedQuestions });
+};
+
+const handleAnswerTypeChange = (qIndex: number, value: 'single' | 'multiple') => {
+  const updatedQuestions = [...(formData.quizQuestions || [])];
+  updatedQuestions[qIndex].answerType = value;
+  updatedQuestions[qIndex].correctAnswers = [];
+  setFormData({ ...formData, quizQuestions: updatedQuestions });
+};
+
+const handleCorrectAnswerChange = (qIndex: number, optIndex: number) => {
+  const updatedQuestions = [...(formData.quizQuestions || [])];
+  const question = updatedQuestions[qIndex];
+
+  if (question.answerType === 'single') {
+    question.correctAnswers = [optIndex];
+  } else {
+    if (question.correctAnswers.includes(optIndex)) {
+      question.correctAnswers = question.correctAnswers.filter((i) => i !== optIndex);
+    } else {
+      question.correctAnswers.push(optIndex);
+    }
+  }
+
+  setFormData({ ...formData, quizQuestions: updatedQuestions });
+};
+
+ const handlePointsChange = (qIndex: number, value: number) => {
+  const updatedQuestions = [...(formData.quizQuestions || [])];
+  updatedQuestions[qIndex].points = value < 0 ? 0 : value;
+  setFormData({ ...formData, quizQuestions: updatedQuestions });
+};
+
+const handleNegativePointsChange = (qIndex: number, value: number) => {
+  const updatedQuestions = [...(formData.quizQuestions || [])];
+  updatedQuestions[qIndex].negativePoints = value; // ✅ negative allow
+  setFormData({ ...formData, quizQuestions: updatedQuestions });
+};
+
+const handleBonusChange = (qIndex: number, checked: boolean) => {
+  const updatedQuestions = [...(formData.quizQuestions || [])];
+  updatedQuestions[qIndex].isBonus = checked;
+  setFormData({ ...formData, quizQuestions: updatedQuestions });
+};
+
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -164,11 +266,59 @@ export default function PlantDashboard() {
       const filteredResearchPapers = formData.researchPapers.filter(item => item.trim() !== '');
       const filteredCategory = formData.category.filter(item => item.trim() !== '');
 
+      // ✅ QUIZ CLEANING
+const cleanedQuizQuestions = (formData.quizQuestions || [])
+  .map((q) => ({
+    ...q,
+    question: q.question.trim(),
+    options: q.options.map((opt) => opt.trim()),
+    correctAnswers: q.correctAnswers,
+    points: Number(q.points) || 0,
+    negativePoints: Number(q.negativePoints) || 0,
+    isBonus: Boolean(q.isBonus),
+  }))
+  .filter((q) => q.question !== '');
+
+// ✅ VALIDATION
+
+for (const q of cleanedQuizQuestions) {
+  if (q.options.some((opt) => opt === '')) {
+    alert('Har question ke 4 options bharna zaroori hai.');
+    setIsSubmitting(false);
+    return;
+  }
+
+  if (q.correctAnswers.length === 0) {
+    alert('Har question ka kam se kam ek correct answer select karo.');
+    setIsSubmitting(false);
+    return;
+  }
+
+  if (q.answerType === 'single' && q.correctAnswers.length > 1) {
+    alert('Single answer type me sirf ek correct answer allowed hai.');
+    setIsSubmitting(false);
+    return;
+  }
+
+  if (q.points < 0) {
+    alert('Points negative nahi ho sakte.');
+    setIsSubmitting(false);
+    return;
+  }
+
+  if (q.negativePoints > 0) {
+    alert('Wrong answer ke liye negative points negative hone chahiye (e.g. -1).');
+    setIsSubmitting(false);
+    return;
+  }
+}
+
       const plantData = {
         ...formData,
         medicinalUse: filteredMedicinalUse,
         researchPapers: filteredResearchPapers,
         category: filteredCategory,   // ✅ Store as array in Firestore
+        quizQuestions: cleanedQuizQuestions,
         updatedAt: serverTimestamp(),
       };
 
@@ -637,6 +787,131 @@ export default function PlantDashboard() {
                     ))}
                   </div>
                 </div>
+
+                <div className="space-y-6">
+  <div className="flex items-center justify-between">
+    <label className="text-[10px] uppercase tracking-widest font-bold opacity-50">
+      Plant Quiz / Gamification
+    </label>
+    <button
+      type="button"
+      onClick={addQuestion}
+      className="text-xs font-bold text-[oklch(35%_0.05_150)] flex items-center gap-1 hover:opacity-70"
+    >
+      <PlusCircle size={14} /> Add Question
+    </button>
+  </div>
+
+  {(formData.quizQuestions || []).map((q, qIndex) => (
+    <div key={qIndex} className="border rounded-2xl p-5 space-y-4 bg-[oklch(98%_0.01_160)]">
+
+  {/* Header */}
+  <div className="flex items-center justify-between">
+    <h3 className="font-semibold">Question {qIndex + 1}</h3>
+    {(formData.quizQuestions || []).length > 1 && (
+      <button
+        type="button"
+        onClick={() => removeQuestion(qIndex)}
+        className="p-2 text-red-500 hover:bg-red-50 rounded-xl"
+      >
+        <Trash2 size={16} />
+      </button>
+    )}
+  </div>
+
+  {/* Question */}
+  <input
+    value={q.question}
+    onChange={(e) => handleQuestionChange(qIndex, e.target.value)}
+    placeholder="Enter question"
+    className="w-full px-4 py-3 border rounded-xl"
+  />
+
+  {/* Answer Type */}
+  <div className="space-y-2">
+    <label className="text-sm font-medium">Answer Type</label>
+    <select
+      value={q.answerType}
+      onChange={(e) =>
+        handleAnswerTypeChange(qIndex, e.target.value as 'single' | 'multiple')
+      }
+      className="w-full px-4 py-3 border rounded-xl"
+    >
+      <option value="single">Single Correct Answer (Radio)</option>
+      <option value="multiple">Multiple Correct Answers (Checkbox)</option>
+    </select>
+  </div>
+
+  {/* ✅ Points + Bonus */}
+  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div className="space-y-2">
+      <label className="text-sm font-medium">Right Answer Points</label>
+      <input
+        type="number"
+        min="0"
+        value={q.points ?? 0}
+        onChange={(e) => handlePointsChange(qIndex, Number(e.target.value))}
+        className="w-full px-4 py-3 border rounded-xl"
+      />
+    </div>
+
+    <div className="space-y-2">
+      <label className="text-sm font-medium">Wrong Answer Negative Points</label>
+     <input
+  type="number"
+  value={q.negativePoints ?? 0}
+  onChange={(e) => handleNegativePointsChange(qIndex, Number(e.target.value))}
+  className="w-full px-4 py-3 border rounded-xl"
+  placeholder="e.g. -1"
+/>
+    </div>
+
+    <div className="space-y-2 flex flex-col justify-end">
+      <label className="text-sm font-medium">Bonus Question</label>
+      <label className="flex items-center gap-2 px-4 py-3 border rounded-xl cursor-pointer">
+        <input
+          type="checkbox"
+          checked={q.isBonus || false}
+          onChange={(e) => handleBonusChange(qIndex, e.target.checked)}
+        />
+        <span>Mark as Bonus</span>
+      </label>
+    </div>
+  </div>
+
+  {/* Options */}
+  <div className="space-y-3">
+    {q.options.map((option, optIndex) => (
+      <div key={optIndex} className="flex items-center gap-3">
+
+        {q.answerType === 'single' ? (
+          <input
+            type="radio"
+            name={`correct-answer-${qIndex}`}
+            checked={q.correctAnswers.includes(optIndex)}
+            onChange={() => handleCorrectAnswerChange(qIndex, optIndex)}
+          />
+        ) : (
+          <input
+            type="checkbox"
+            checked={q.correctAnswers.includes(optIndex)}
+            onChange={() => handleCorrectAnswerChange(qIndex, optIndex)}
+          />
+        )}
+
+        <input
+          value={option}
+          onChange={(e) => handleOptionChange(qIndex, optIndex, e.target.value)}
+          placeholder={`Option ${optIndex + 1}`}
+          className="flex-1 px-4 py-3 border rounded-xl"
+        />
+      </div>
+    ))}
+  </div>
+
+</div>
+  ))}
+</div>
 
                 {/* Submit Buttons */}
                 <div className="pt-6 flex gap-4">

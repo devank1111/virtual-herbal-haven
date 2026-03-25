@@ -27,6 +27,18 @@ import {
 // ─────────────────────────────────────────────────────────────
 // TYPE — Firebase ke actual field names ke according
 // ─────────────────────────────────────────────────────────────
+
+interface QuizQuestion {
+  question: string;
+  answerType: 'single' | 'multiple';
+  options: string[];
+  correctAnswers: number[];
+  points: number;
+  negativePoints: number;
+  isBonus: boolean;
+}
+
+
 export interface Plant {
   id: string;
   name: string;
@@ -48,6 +60,7 @@ export interface Plant {
   state?: string;
   lat?: number;
   lng?: number;
+  quizQuestions?: QuizQuestion[];
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -58,6 +71,24 @@ function toStringArray(val: unknown): string[] {
   if (typeof val === "string" && val.trim()) return val.split(",").map((s) => s.trim());
   return [];
 }
+
+function normalizeQuizQuestions(val: unknown): QuizQuestion[] {
+  if (!Array.isArray(val)) return [];
+
+  return val.map((q: any) => ({
+    question: typeof q?.question === "string" ? q.question : "",
+    answerType: q?.answerType === "multiple" ? "multiple" : "single",
+    options: Array.isArray(q?.options) ? q.options.filter((opt: unknown) => typeof opt === "string") : [],
+    correctAnswers: Array.isArray(q?.correctAnswers)
+      ? q.correctAnswers.filter((i: unknown) => typeof i === "number")
+      : [],
+    points: typeof q?.points === "number" ? q.points : 0,
+    negativePoints: typeof q?.negativePoints === "number" ? q.negativePoints : 0,
+    isBonus: Boolean(q?.isBonus),
+  }));
+  
+}
+
 
 function normalizePlant(id: string, data: Record<string, unknown>): Plant {
   return {
@@ -81,8 +112,11 @@ function normalizePlant(id: string, data: Record<string, unknown>): Plant {
     state:          (data.state as string) ?? undefined,
     lat:            (data.lat as number) ?? undefined,
     lng:            (data.lng as number) ?? undefined,
+    quizQuestions: normalizeQuizQuestions(data.quizQuestions),
   };
 }
+
+
 
 // ─────────────────────────────────────────────────────────────
 // FIREBASE FETCH HOOK
@@ -486,6 +520,254 @@ function ResearchTab({ plant }: { plant: Plant }) {
   );
 }
 
+function QuizTab({ plant }: { plant: Plant }) {
+  const questions = plant.quizQuestions ?? [];
+  const [answers, setAnswers] = useState<Record<number, number[]>>({});
+  const [submitted, setSubmitted] = useState(false);
+
+  const handleSingleSelect = (qIndex: number, optIndex: number) => {
+    if (submitted) return;
+    setAnswers((prev) => ({
+      ...prev,
+      [qIndex]: [optIndex],
+    }));
+  };
+
+  const handleMultipleSelect = (qIndex: number, optIndex: number) => {
+    if (submitted) return;
+
+    setAnswers((prev) => {
+      const current = prev[qIndex] || [];
+      const exists = current.includes(optIndex);
+
+      return {
+        ...prev,
+        [qIndex]: exists
+          ? current.filter((i) => i !== optIndex)
+          : [...current, optIndex],
+      };
+    });
+  };
+
+  const isCorrectAnswer = (userAns: number[], correctAns: number[]) => {
+    if (userAns.length !== correctAns.length) return false;
+    const sortedUser = [...userAns].sort();
+    const sortedCorrect = [...correctAns].sort();
+    return sortedUser.every((val, idx) => val === sortedCorrect[idx]);
+  };
+
+  const report = questions.map((q, qIndex) => {
+    const userAns = answers[qIndex] || [];
+    const isCorrect = isCorrectAnswer(userAns, q.correctAnswers);
+
+    const earned = userAns.length === 0
+      ? 0
+      : isCorrect
+      ? q.points
+      : q.negativePoints;
+
+    return {
+      question: q.question,
+      isCorrect,
+      earned,
+      isBonus: q.isBonus,
+      correctAnswers: q.correctAnswers,
+      userAnswers: userAns,
+      points: q.points,
+      negativePoints: q.negativePoints,
+    };
+  });
+
+  const totalScore = report.reduce((sum, item) => sum + item.earned, 0);
+  const correctCount = report.filter((r) => r.isCorrect).length;
+  const wrongCount = report.filter((r) => r.userAnswers.length > 0 && !r.isCorrect).length;
+  const skippedCount = report.filter((r) => r.userAnswers.length === 0).length;
+  const bonusCount = report.filter((r) => r.isBonus).length;
+
+  if (questions.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm py-16 text-center">
+        <p className="text-4xl mb-3">🎯</p>
+        <p className="text-gray-600 font-semibold text-[15px]">No quiz available yet</p>
+        <p className="text-gray-400 text-sm mt-1">Quiz questions will appear here for this plant.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      {!submitted && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+          <h2 className="text-[18px] font-bold text-gray-800">Quiz on {plant.name}</h2>
+          <p className="text-sm text-gray-500 mt-1">
+            Submit karke apna score aur report card dekho.
+          </p>
+        </div>
+      )}
+
+      {questions.map((q, qIndex) => (
+        <div key={qIndex} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">
+                Question {qIndex + 1}
+              </p>
+              <h3 className="text-[16px] font-semibold text-gray-800">{q.question}</h3>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-100">
+                +{q.points}
+              </span>
+              <span className="px-3 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-100">
+                {q.negativePoints}
+              </span>
+              {q.isBonus && (
+                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-100">
+                  Bonus
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {q.options.map((option, optIndex) => {
+              const selected = (answers[qIndex] || []).includes(optIndex);
+              const correct = q.correctAnswers.includes(optIndex);
+
+              let optionClass =
+                "border-gray-200 hover:border-green-300";
+
+              if (submitted) {
+                if (correct) optionClass = "border-green-400 bg-green-50";
+                else if (selected && !correct) optionClass = "border-red-400 bg-red-50";
+              } else if (selected) {
+                optionClass = "border-green-400 bg-green-50";
+              }
+
+              return (
+                <label
+                  key={optIndex}
+                  className={`flex items-center gap-3 border rounded-xl px-4 py-3 cursor-pointer transition-all ${optionClass}`}
+                >
+                  {q.answerType === "single" ? (
+                    <input
+                      type="radio"
+                      name={`question-${qIndex}`}
+                      checked={selected}
+                      disabled={submitted}
+                      onChange={() => handleSingleSelect(qIndex, optIndex)}
+                    />
+                  ) : (
+                    <input
+                      type="checkbox"
+                      checked={selected}
+                      disabled={submitted}
+                      onChange={() => handleMultipleSelect(qIndex, optIndex)}
+                    />
+                  )}
+                  <span className="text-[14.5px] text-gray-700">{option}</span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+
+      {!submitted ? (
+        <button
+          onClick={() => setSubmitted(true)}
+          className="w-full bg-[oklch(35%_0.05_150)] text-white py-4 rounded-2xl font-bold hover:bg-[oklch(25%_0.05_150)] transition-all shadow-xl shadow-[oklch(35%_0.05_150/0.15)]"
+        >
+          Submit Quiz
+        </button>
+      ) : (
+        <div className="space-y-4">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+            <h2 className="text-[18px] font-bold text-gray-800 mb-4">Report Card</h2>
+
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <div className="rounded-xl border border-gray-100 p-4 bg-gray-50">
+                <p className="text-xs text-gray-500">Total Score</p>
+                <p className="text-2xl font-bold text-gray-900">{totalScore}</p>
+              </div>
+              <div className="rounded-xl border border-gray-100 p-4 bg-green-50">
+                <p className="text-xs text-gray-500">Correct</p>
+                <p className="text-2xl font-bold text-green-700">{correctCount}</p>
+              </div>
+              <div className="rounded-xl border border-gray-100 p-4 bg-red-50">
+                <p className="text-xs text-gray-500">Wrong</p>
+                <p className="text-2xl font-bold text-red-700">{wrongCount}</p>
+              </div>
+              <div className="rounded-xl border border-gray-100 p-4 bg-yellow-50">
+                <p className="text-xs text-gray-500">Skipped</p>
+                <p className="text-2xl font-bold text-yellow-700">{skippedCount}</p>
+              </div>
+              <div className="rounded-xl border border-gray-100 p-4 bg-amber-50">
+                <p className="text-xs text-gray-500">Bonus Qs</p>
+                <p className="text-2xl font-bold text-amber-700">{bonusCount}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+            <h3 className="text-[16px] font-bold text-gray-800 mb-4">Question-wise Result</h3>
+
+            <div className="space-y-3">
+              {report.map((r, idx) => (
+                <div
+                  key={idx}
+                  className={`rounded-xl border p-4 ${
+                    r.isCorrect
+                      ? "border-green-200 bg-green-50"
+                      : r.userAnswers.length === 0
+                      ? "border-yellow-200 bg-yellow-50"
+                      : "border-red-200 bg-red-50"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800">
+                        Q{idx + 1}. {r.question}
+                      </p>
+                      <p className="text-xs text-gray-600 mt-1">
+                        {r.userAnswers.length === 0
+                          ? "Skipped"
+                          : r.isCorrect
+                          ? "Correct"
+                          : "Wrong"}
+                      </p>
+                    </div>
+
+                    <div className="text-right">
+                      <p className="text-sm font-bold">
+                        {r.earned > 0 ? `+${r.earned}` : r.earned}
+                      </p>
+                      {r.isBonus && (
+                        <p className="text-xs text-amber-700 font-semibold">Bonus</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={() => {
+                setAnswers({});
+                setSubmitted(false);
+              }}
+              className="mt-5 px-5 py-3 rounded-xl border border-gray-200 hover:bg-gray-50 font-medium"
+            >
+              Retry Quiz
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────
 // TABS
 // ─────────────────────────────────────────────────────────────
@@ -493,6 +775,7 @@ const TABS = [
   { id: "overview", label: "Overview", icon: "🌿" },
   { id: "model",    label: "3D Model", icon: "👁"  },
   { id: "research", label: "Research", icon: "🧪" },
+  { id: "quiz",     label: "Quiz",     icon: "🎯" },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -732,6 +1015,7 @@ export default function PlantDetail() {
             {activeTab === "overview" && <OverviewTab  plant={plant} />}
             {activeTab === "model"    && <ModelTab     plant={plant} />}
             {activeTab === "research" && <ResearchTab  plant={plant} />}
+            {activeTab === "quiz"     && <QuizTab      plant={plant} />}
           </motion.div>
         </AnimatePresence>
       </main>

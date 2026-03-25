@@ -13,6 +13,7 @@ import Signup from "./pages/Signup";
 import Login from "./pages/Login";
 import Profile from "./components/PlantsPortal/Profile"
 import PlantDetails from "./components/PlantsPortal/PlantDetails/PlantDetails";
+import GlobalMusicPlayer from "./components/GlobalMusicPlayer";
 
 // Admin panel
 import AdminDashboard from "./pages/adminPanel/dashboard";
@@ -29,6 +30,8 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
+        <GlobalMusicPlayer />
+        
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<Login />} />
