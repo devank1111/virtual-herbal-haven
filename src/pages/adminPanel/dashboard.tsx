@@ -47,6 +47,7 @@ interface Plant {
   name: string;
   about: string;
   image: string;
+  youtubeEmbedUrl?: string;
   medicinalUse: string[];
   nativeLocation: string;
   keyResearcher: string;
@@ -80,6 +81,7 @@ const INITIAL_FORM_STATE: Omit<Plant, 'id'> = {
   name: '',
   about: '',
   image: '',
+  youtubeEmbedUrl: '',
   medicinalUse: [''],
   nativeLocation: '',
   keyResearcher: '',
@@ -260,6 +262,24 @@ const handleBonusChange = (qIndex: number, checked: boolean) => {
     e.preventDefault();
     setIsSubmitting(true);
 
+    const convertToEmbedUrl = (url: string) => {
+  if (!url) return '';
+
+  if (url.includes('youtube.com/embed/')) return url;
+
+  const watchMatch = url.match(/[?&]v=([^&]+)/);
+  if (watchMatch?.[1]) {
+    return `https://www.youtube.com/embed/${watchMatch[1]}`;
+  }
+
+  const shortMatch = url.match(/youtu\.be\/([^?&]+)/);
+  if (shortMatch?.[1]) {
+    return `https://www.youtube.com/embed/${shortMatch[1]}`;
+  }
+
+  return url;
+};
+
     try {
       // ✅ Filter empty strings from all three arrays
       const filteredMedicinalUse = formData.medicinalUse.filter(item => item.trim() !== '');
@@ -315,6 +335,7 @@ for (const q of cleanedQuizQuestions) {
 
       const plantData = {
         ...formData,
+        youtubeEmbedUrl: formData.youtubeEmbedUrl?.trim() || '',
         medicinalUse: filteredMedicinalUse,
         researchPapers: filteredResearchPapers,
         category: filteredCategory,   // ✅ Store as array in Firestore
@@ -713,7 +734,18 @@ for (const q of cleanedQuizQuestions) {
                     placeholder="https://images.unsplash.com/..."
                   />
                 </div>
-
+                 <div className="space-y-2">
+  <label className="text-[10px] uppercase tracking-widest font-bold opacity-50">
+    YouTube Embedded URL
+  </label>
+  <input
+    name="youtubeEmbedUrl"
+    value={formData.youtubeEmbedUrl || ''}
+    onChange={handleInputChange}
+    className="w-full px-4 py-3 bg-[oklch(98%_0.01_160)] border border-[oklch(90%_0.01_160)] rounded-xl focus:ring-2 ring-[oklch(35%_0.05_150/0.2)] outline-none transition-all"
+    placeholder="https://www.youtube.com/embed/VIDEO_ID"
+  />
+</div>
                 {/* Medicinal Use (array) */}
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">

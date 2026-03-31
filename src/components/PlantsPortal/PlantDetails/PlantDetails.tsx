@@ -46,6 +46,7 @@ export interface Plant {
   hindiName?: string;
   about?: string;             // Firebase: "about"
   image: string;
+  youtubeEmbedUrl?: string; 
   category: string;           // Firebase: single string e.g. "Medicinal desert shrub"
   medicinalUse?: string[];    // Firebase: "medicinalUse" array
   conditions?: string[];
@@ -98,6 +99,7 @@ function normalizePlant(id: string, data: Record<string, unknown>): Plant {
     hindiName:      (data.hindiName as string) ?? undefined,
     about:          (data.about as string) ?? undefined,
     image:          (data.image as string) ?? "",
+    youtubeEmbedUrl: (data.youtubeEmbedUrl as string) ?? undefined,
     category:       typeof data.category === "string" ? data.category : "",
     medicinalUse:   toStringArray(data.medicinalUse),
     conditions:     toStringArray(data.conditions),
@@ -430,26 +432,69 @@ function OverviewTab({ plant }: { plant: Plant }) {
   );
 }
 
+// 🔽 YEH YAHA PASTE KARNA HAI (ModelTab ke upar)
+const extractEmbedUrl = (value?: string) => {
+  if (!value) return "";
+
+  // agar direct embed URL hai
+  if (value.includes("youtube.com/embed/")) {
+    const srcMatch = value.match(/src="([^"]+)"/);
+    return srcMatch?.[1] || value;
+  }
+
+  // agar iframe HTML hai
+  const iframeSrcMatch = value.match(/src="([^"]+)"/);
+  if (iframeSrcMatch?.[1]) {
+    return iframeSrcMatch[1];
+  }
+
+  return value;
+};
+
 // ─────────────────────────────────────────────────────────────
 // 3D MODEL TAB
 // ─────────────────────────────────────────────────────────────
 function ModelTab({ plant }: { plant: Plant }) {
+  const videoUrl = extractEmbedUrl(plant.youtubeEmbedUrl);
+
   return (
     <div className="space-y-4">
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="px-6 py-5 border-b border-gray-100 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center text-base">👁</div>
+          <div className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center text-base">
+            🎥
+          </div>
           <div>
-            <h2 className="text-[15px] font-bold text-gray-800">3D Model — {plant.name}</h2>
-            <p className="text-[13px] text-gray-400 mt-0.5">Rotate and explore interactively</p>
+            <h2 className="text-[15px] font-bold text-gray-800">
+              Plant Video — {plant.name}
+            </h2>
+            <p className="text-[13px] text-gray-400 mt-0.5">
+              Embedded YouTube video
+            </p>
           </div>
         </div>
-        <div className="w-full h-[480px] bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 flex items-center justify-center">
-          <div className="text-center space-y-2 opacity-40">
-            <div className="text-5xl">🌿</div>
-            <p className="text-gray-500 text-sm font-medium">3D Model renders here</p>
+
+        {videoUrl ? (
+          <div className="w-full aspect-video bg-black">
+            <iframe
+              src={videoUrl}
+              title={`${plant.name} video`}
+              className="w-full h-full"
+              frameBorder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+            />
           </div>
-        </div>
+        ) : (
+          <div className="w-full h-[480px] bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 flex items-center justify-center">
+            <div className="text-center space-y-2 opacity-40">
+              <div className="text-5xl">🎥</div>
+              <p className="text-gray-500 text-sm font-medium">
+                Video not available
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
