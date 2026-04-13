@@ -11,7 +11,7 @@ import PlantDetail from "./components/PlantsPortal/Un Used Componets/PlantDetail
 import VirtualTour from "./pages/VirtualTour";
 import Signup from "./pages/Signup";
 import Login from "./pages/Login";
-import Profile from "./components/PlantsPortal/Profile"
+import Profile from "./components/PlantsPortal/Profile";
 import PlantDetails from "./components/PlantsPortal/PlantDetails/PlantDetails";
 import GlobalMusicPlayer from "./components/GlobalMusicPlayer";
 
@@ -30,20 +30,48 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-        <GlobalMusicPlayer />
-        
+          <GlobalMusicPlayer />
+
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
-            <Route path="/garden" element={<ProtectedRoute><Garden /></ProtectedRoute>} />
+            <Route path="/garden" element={<Garden />} />
             {/* <Route path="/plant/:id" element={<ProtectedRoute><PlantDetail /></ProtectedRoute>} /> */}
-            <Route path = "/plant/:id" element= {<PlantDetails />} />
-            <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-            <Route path="/tour" element={<ProtectedRoute><VirtualTour /></ProtectedRoute>} />
+            <Route
+              path="/plant/:id"
+              element={
+                <ProtectedRoute>
+                  <PlantDetails />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute>
+                  <Profile />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/tour"
+              element={
+                <ProtectedRoute>
+                  <VirtualTour />
+                </ProtectedRoute>
+              }
+            />
 
             {/* Admin Panel */}
-            <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute role="admin">
+                  <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
             <Route path="/admin-login" element={<AdminLogin />} />
             <Route path="/admin-signup" element={<AdminSignup />} />
 

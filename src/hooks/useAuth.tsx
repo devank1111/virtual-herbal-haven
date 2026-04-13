@@ -116,42 +116,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // ================= USER LOGIN =================
 
   const signIn = async (email: string, password: string) => {
-    try {
+  try {
+    const result = await signInWithEmailAndPassword(auth, email, password);
 
-      const result = await signInWithEmailAndPassword(auth, email, password);
+    const userDoc = await getDoc(doc(db, "users", result.user.uid));
 
-      const userDoc = await getDoc(doc(db, "users", result.user.uid));
+    if (!userDoc.exists()) {
+      // wrong role → logout immediately
+      await firebaseSignOut(auth);
 
-      if (!userDoc.exists()) {
-        return { error: { message: "User account not found" } };
-      }
-
-      return { error: null };
-
-    } catch (error) {
-      return { error };
+      return { error: { message: "You are not registered as a user" } };
     }
-  };
+
+    return { error: null };
+
+  } catch (error: any) {
+    return { error: { message: error.message } };
+  }
+};
 
   // ================= ADMIN LOGIN =================
 
   const signInAdmin = async (email: string, password: string) => {
-    try {
+  try {
+    const result = await signInWithEmailAndPassword(auth, email, password);
 
-      const result = await signInWithEmailAndPassword(auth, email, password);
+    const adminDoc = await getDoc(doc(db, "admins", result.user.uid));
 
-      const adminDoc = await getDoc(doc(db, "admins", result.user.uid));
+    if (!adminDoc.exists()) {
+      // wrong role → logout immediately
+      await firebaseSignOut(auth);
 
-      if (!adminDoc.exists()) {
-        return { error: { message: "You are not an admin" } };
-      }
-
-      return { error: null };
-
-    } catch (error) {
-      return { error };
+      return { error: { message: "You are not an admin" } };
     }
-  };
+
+    return { error: null };
+
+  } catch (error: any) {
+    return { error: { message: error.message } };
+  }
+};
 
   // ================= LOGOUT =================
 

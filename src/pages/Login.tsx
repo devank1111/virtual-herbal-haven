@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Navigate, Link } from "react-router-dom";
+import { Navigate, Link, useLocation, useNavigate} from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Leaf, Mail, Lock, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
@@ -11,6 +11,11 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+
+// ⭐ yeh line magic hai
+  const from = location.state?.from?.pathname || "/garden";
 
   if (loading) {
     return (
@@ -20,7 +25,7 @@ export default function Login() {
     );
   }
 
-  if (user) return <Navigate to="/garden" replace />;
+  // if (user) return <Navigate to="/garden" replace />;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,6 +45,10 @@ export default function Login() {
     setSubmitting(true);
     try {
       const { error } = await signIn(trimmedEmail, password);
+      if (error) throw error;
+
+// ⭐ yeh redirect karega same page pe
+navigate(from, { replace: true });
       if (error) throw error;
       toast.success("Welcome back!");
     } catch (error: any) {

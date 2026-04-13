@@ -818,8 +818,8 @@ function QuizTab({ plant }: { plant: Plant }) {
 // ─────────────────────────────────────────────────────────────
 const TABS = [
   { id: "overview", label: "Overview", icon: "🌿" },
-  { id: "model",    label: "3D Model", icon: "👁"  },
-  { id: "research", label: "Research", icon: "🧪" },
+  { id: "model",    label: "How to Grow in Your Garden", icon: "👁"  },
+  { id: "research", label: "Research Papers", icon: "🧪" },
   { id: "quiz",     label: "Quiz",     icon: "🎯" },
 ] as const;
 
