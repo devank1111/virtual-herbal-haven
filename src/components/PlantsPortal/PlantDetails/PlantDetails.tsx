@@ -6,6 +6,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { useBookmarks } from "@/hooks/useBookmarks";
 import Header from "@/components/NavFoot/Header";
 import Footer from "@/components/NavFoot/Footer";
+import PlantModel from "@/components/PlantsPortal/PlantDetails/PlantModel"; // Import the PlantModel component
 import {
   ArrowLeft,
   Bookmark,
@@ -22,6 +23,7 @@ import {
   Utensils,
   Volume2,
   VolumeX,
+  Box,
 } from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────
@@ -38,7 +40,6 @@ interface QuizQuestion {
   isBonus: boolean;
 }
 
-
 export interface Plant {
   id: string;
   name: string;
@@ -47,6 +48,7 @@ export interface Plant {
   about?: string;             // Firebase: "about"
   image: string;
   youtubeEmbedUrl?: string; 
+  modelUrl?: string;
   category: string;           // Firebase: single string e.g. "Medicinal desert shrub"
   medicinalUse?: string[];    // Firebase: "medicinalUse" array
   conditions?: string[];
@@ -87,9 +89,7 @@ function normalizeQuizQuestions(val: unknown): QuizQuestion[] {
     negativePoints: typeof q?.negativePoints === "number" ? q.negativePoints : 0,
     isBonus: Boolean(q?.isBonus),
   }));
-  
 }
-
 
 function normalizePlant(id: string, data: Record<string, unknown>): Plant {
   return {
@@ -100,6 +100,7 @@ function normalizePlant(id: string, data: Record<string, unknown>): Plant {
     about:          (data.about as string) ?? undefined,
     image:          (data.image as string) ?? "",
     youtubeEmbedUrl: (data.youtubeEmbedUrl as string) ?? undefined,
+    modelUrl: (data.modelUrl as string) ?? undefined,
     category:       typeof data.category === "string" ? data.category : "",
     medicinalUse:   toStringArray(data.medicinalUse),
     conditions:     toStringArray(data.conditions),
@@ -117,8 +118,6 @@ function normalizePlant(id: string, data: Record<string, unknown>): Plant {
     quizQuestions: normalizeQuizQuestions(data.quizQuestions),
   };
 }
-
-
 
 // ─────────────────────────────────────────────────────────────
 // FIREBASE FETCH HOOK
@@ -432,7 +431,7 @@ function OverviewTab({ plant }: { plant: Plant }) {
   );
 }
 
-// 🔽 YEH YAHA PASTE KARNA HAI (ModelTab ke upar)
+// Helper function to extract YouTube embed URL
 const extractEmbedUrl = (value?: string) => {
   if (!value) return "";
 
@@ -452,9 +451,9 @@ const extractEmbedUrl = (value?: string) => {
 };
 
 // ─────────────────────────────────────────────────────────────
-// 3D MODEL TAB
+// HOW TO GROW TAB (Previously ModelTab)
 // ─────────────────────────────────────────────────────────────
-function ModelTab({ plant }: { plant: Plant }) {
+function HowToGrowTab({ plant }: { plant: Plant }) {
   const videoUrl = extractEmbedUrl(plant.youtubeEmbedUrl);
 
   return (
@@ -466,10 +465,10 @@ function ModelTab({ plant }: { plant: Plant }) {
           </div>
           <div>
             <h2 className="text-[15px] font-bold text-gray-800">
-              Plant Video — {plant.name}
+              How to Grow — {plant.name}
             </h2>
             <p className="text-[13px] text-gray-400 mt-0.5">
-              Embedded YouTube video
+              Learn how to cultivate this plant in your garden
             </p>
           </div>
         </div>
@@ -478,7 +477,7 @@ function ModelTab({ plant }: { plant: Plant }) {
           <div className="w-full aspect-video bg-black">
             <iframe
               src={videoUrl}
-              title={`${plant.name} video`}
+              title={`How to grow ${plant.name}`}
               className="w-full h-full"
               frameBorder="0"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
@@ -490,11 +489,72 @@ function ModelTab({ plant }: { plant: Plant }) {
             <div className="text-center space-y-2 opacity-40">
               <div className="text-5xl">🎥</div>
               <p className="text-gray-500 text-sm font-medium">
-                Video not available
+                Growing guide video not available yet
               </p>
+              <p className="text-gray-400 text-xs">We're working on adding this content.</p>
             </div>
           </div>
         )}
+      </div>
+
+      {/* Additional growing tips section */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-8 h-8 rounded-xl bg-green-50 flex items-center justify-center">
+            <Leaf className="w-4 h-4 text-green-600" />
+          </div>
+          <h3 className="text-[15px] font-bold text-gray-800">Growing Tips</h3>
+        </div>
+        <div className="space-y-3 text-gray-600 text-[14px] leading-relaxed">
+          <p>• Plant in well-draining soil with adequate sunlight based on the plant's native habitat.</p>
+          <p>• Water regularly but avoid overwatering — let the soil dry between watering sessions.</p>
+          <p>• Use organic fertilizers during the growing season for best results.</p>
+          <p>• Prune dead leaves and stems to encourage healthy growth.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// 3D MODELS TAB (NEW)
+// ─────────────────────────────────────────────────────────────
+function ModelsTab({ plant }: { plant: Plant }) {
+  return (
+    <div className="space-y-4">
+      {/* Header Card */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-6 py-5 flex items-center gap-3">
+        <div className="w-8 h-8 rounded-xl bg-purple-50 flex items-center justify-center">
+          <Box className="w-4 h-4 text-purple-600" />
+        </div>
+        <div>
+          <h2 className="text-[15px] font-bold text-gray-800">3D Plant Model</h2>
+          <p className="text-[13px] text-gray-400 mt-0.5">
+            Interactive 3D visualization of {plant.name}
+          </p>
+        </div>
+      </div>
+
+      {/* PlantModel Component */}
+      <PlantModel 
+        modelUrl={plant.modelUrl} 
+        plantName={plant.name}
+      />
+
+      {/* Info Card about 3D Model */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center text-base">
+            ℹ️
+          </div>
+          <h3 className="text-[15px] font-bold text-gray-800">About this 3D Model</h3>
+        </div>
+        <div className="space-y-3 text-gray-600 text-[14px] leading-relaxed">
+          <p>• Drag to rotate the model and view the plant from all angles.</p>
+          <p>• Use scroll/pinch to zoom in and out for detailed observation.</p>
+          <p>• Click the AR button to view the plant in your space using augmented reality.</p>
+          <p>• The model auto-rotates to give you a complete view of the plant structure.</p>
+        </div>
       </div>
     </div>
   );
@@ -814,13 +874,14 @@ function QuizTab({ plant }: { plant: Plant }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// TABS
+// TABS — Updated with new Models tab
 // ─────────────────────────────────────────────────────────────
 const TABS = [
   { id: "overview", label: "Overview", icon: "🌿" },
-  { id: "model",    label: "How to Grow in Your Garden", icon: "👁"  },
+  { id: "how-to-grow", label: "How to Grow", icon: "🎥" },
+  { id: "models", label: "3D Models", icon: "🔮" },
   { id: "research", label: "Research Papers", icon: "🧪" },
-  { id: "quiz",     label: "Quiz",     icon: "🎯" },
+  { id: "quiz", label: "Quiz", icon: "🎯" },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -1024,12 +1085,12 @@ export default function PlantDetail() {
 
       {/* ── TAB BAR ── */}
       <div className="max-w-5xl mx-auto w-full px-6 pt-6 mb-5">
-        <div className="flex bg-white rounded-2xl border border-gray-100 shadow-sm p-1.5 gap-1">
+        <div className="flex flex-wrap bg-white rounded-2xl border border-gray-100 shadow-sm p-1.5 gap-1">
           {TABS.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`relative flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-[13.5px] font-semibold transition-all duration-200 ${
+              className={`relative flex-1 min-w-[100px] flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-[13.5px] font-semibold transition-all duration-200 ${
                 activeTab === tab.id ? "text-green-800" : "text-gray-400 hover:text-gray-600"
               }`}
             >
@@ -1041,7 +1102,10 @@ export default function PlantDetail() {
                 />
               )}
               <span className="relative z-10 text-sm">{tab.icon}</span>
-              <span className="relative z-10">{tab.label}</span>
+              <span className="relative z-10 hidden sm:inline">{tab.label}</span>
+              <span className="relative z-10 sm:hidden text-xs">
+                {tab.id === "how-to-grow" ? "Grow" : tab.id === "models" ? "3D" : tab.label}
+              </span>
             </button>
           ))}
         </div>
@@ -1057,10 +1121,11 @@ export default function PlantDetail() {
             exit={{ opacity: 0, y: -5 }}
             transition={{ duration: 0.18 }}
           >
-            {activeTab === "overview" && <OverviewTab  plant={plant} />}
-            {activeTab === "model"    && <ModelTab     plant={plant} />}
-            {activeTab === "research" && <ResearchTab  plant={plant} />}
-            {activeTab === "quiz"     && <QuizTab      plant={plant} />}
+            {activeTab === "overview" && <OverviewTab plant={plant} />}
+            {activeTab === "how-to-grow" && <HowToGrowTab plant={plant} />}
+            {activeTab === "models" && <ModelsTab plant={plant} />}
+            {activeTab === "research" && <ResearchTab plant={plant} />}
+            {activeTab === "quiz" && <QuizTab plant={plant} />}
           </motion.div>
         </AnimatePresence>
       </main>

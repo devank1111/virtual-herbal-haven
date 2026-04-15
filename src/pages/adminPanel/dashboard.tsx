@@ -17,7 +17,8 @@ import {
   Hash,
   Languages,
   BookOpen,
-  Droplets
+  Droplets,
+  Box
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { db } from '@/firebase'; // adjust path to your firebase config
@@ -36,18 +37,19 @@ interface QuizQuestion {
   answerType: 'single' | 'multiple';
   options: string[];
   correctAnswers: number[];
-  points: number;         // right answer pe kitne points
-  negativePoints: number; // wrong answer pe kitne minus
-  isBonus: boolean;       // bonus question ya nahi
+  points: number;
+  negativePoints: number;
+  isBonus: boolean;
 }
 
-// ✅ Updated Plant interface — category is now string[]
+// ✅ Plant interface — modelUrl added
 interface Plant {
   id: string;
   name: string;
   about: string;
   image: string;
   youtubeEmbedUrl?: string;
+  modelUrl?: string;          // ✅ NEW: 3D model URL
   medicinalUse: string[];
   nativeLocation: string;
   keyResearcher: string;
@@ -55,7 +57,7 @@ interface Plant {
   researchPapers: string[];
   scientificName: string;
   hindiName: string;
-  category: string[];   // ✅ Changed from string to string[]
+  category: string[];
   city: string;
   state: string;
   lat?: number;
@@ -76,12 +78,13 @@ const INITIAL_QUESTION: QuizQuestion = {
   isBonus: false,
 };
 
-// ✅ Updated initial form state — category is now array
+// ✅ Initial form state — modelUrl added
 const INITIAL_FORM_STATE: Omit<Plant, 'id'> = {
   name: '',
   about: '',
   image: '',
   youtubeEmbedUrl: '',
+  modelUrl: '',               // ✅ NEW
   medicinalUse: [''],
   nativeLocation: '',
   keyResearcher: '',
@@ -89,7 +92,7 @@ const INITIAL_FORM_STATE: Omit<Plant, 'id'> = {
   researchPapers: [''],
   scientificName: '',
   hindiName: '',
-  category: [''],        // ✅ Array with one empty string
+  category: [''],
   city: '',
   state: '',
   lat: undefined,
@@ -125,9 +128,9 @@ export default function PlantDashboard() {
     if (plant) {
       setFormData({
         ...plant,
+        modelUrl: plant.modelUrl || '',   // ✅ Handle old docs without modelUrl
         medicinalUse: plant.medicinalUse?.length ? plant.medicinalUse : [''],
         researchPapers: plant.researchPapers?.length ? plant.researchPapers : [''],
-        // ✅ Handle old documents where category was a string
         category: Array.isArray(plant.category)
           ? (plant.category.length ? plant.category : [''])
           : (plant.category ? [plant.category] : ['']),
@@ -146,7 +149,6 @@ export default function PlantDashboard() {
     setEditingId(null);
   };
 
-  // Generic input change handler for text/textarea
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
     if (type === 'number') {
@@ -156,7 +158,6 @@ export default function PlantDashboard() {
     }
   };
 
-  // ✅ Updated: now handles 'category' as well
   const handleArrayInputChange = (
     e: React.ChangeEvent<HTMLInputElement>,
     field: 'medicinalUse' | 'researchPapers' | 'category',
@@ -167,178 +168,158 @@ export default function PlantDashboard() {
     setFormData({ ...formData, [field]: updatedArray });
   };
 
-  // ✅ Updated: now handles 'category' as well
   const addArrayField = (field: 'medicinalUse' | 'researchPapers' | 'category') => {
     setFormData({ ...formData, [field]: [...formData[field], ''] });
   };
 
-  // ✅ Updated: now handles 'category' as well
   const removeArrayField = (field: 'medicinalUse' | 'researchPapers' | 'category', index: number) => {
     const updatedArray = formData[field].filter((_, i) => i !== index);
     setFormData({ ...formData, [field]: updatedArray });
   };
 
-  // ✅ YAHAN SE quiz functions add karne hain
-const addQuestion = () => {
-  setFormData({
-    ...formData,
-    quizQuestions: [
-      ...(formData.quizQuestions || []),
-      {
-  question: '',
-  answerType: 'single',
-  options: ['', '', '', ''],
-  correctAnswers: [],
-  points: 5,
-  negativePoints: 0,
-  isBonus: false,
-}
-    ],
-  });
-};
+  const addQuestion = () => {
+    setFormData({
+      ...formData,
+      quizQuestions: [
+        ...(formData.quizQuestions || []),
+        {
+          question: '',
+          answerType: 'single',
+          options: ['', '', '', ''],
+          correctAnswers: [],
+          points: 5,
+          negativePoints: 0,
+          isBonus: false,
+        }
+      ],
+    });
+  };
 
+  const removeQuestion = (qIndex: number) => {
+    const updatedQuestions = (formData.quizQuestions || []).filter((_, i) => i !== qIndex);
+    setFormData({ ...formData, quizQuestions: updatedQuestions });
+  };
 
-const removeQuestion = (qIndex: number) => {
-  const updatedQuestions = (formData.quizQuestions || []).filter((_, i) => i !== qIndex);
-  setFormData({ ...formData, quizQuestions: updatedQuestions });
-};
+  const handleQuestionChange = (qIndex: number, value: string) => {
+    const updatedQuestions = [...(formData.quizQuestions || [])];
+    updatedQuestions[qIndex].question = value;
+    setFormData({ ...formData, quizQuestions: updatedQuestions });
+  };
 
-const handleQuestionChange = (qIndex: number, value: string) => {
-  const updatedQuestions = [...(formData.quizQuestions || [])];
-  updatedQuestions[qIndex].question = value;
-  setFormData({ ...formData, quizQuestions: updatedQuestions });
-};
+  const handleOptionChange = (qIndex: number, optIndex: number, value: string) => {
+    const updatedQuestions = [...(formData.quizQuestions || [])];
+    updatedQuestions[qIndex].options[optIndex] = value;
+    setFormData({ ...formData, quizQuestions: updatedQuestions });
+  };
 
-const handleOptionChange = (qIndex: number, optIndex: number, value: string) => {
-  const updatedQuestions = [...(formData.quizQuestions || [])];
-  updatedQuestions[qIndex].options[optIndex] = value;
-  setFormData({ ...formData, quizQuestions: updatedQuestions });
-};
+  const handleAnswerTypeChange = (qIndex: number, value: 'single' | 'multiple') => {
+    const updatedQuestions = [...(formData.quizQuestions || [])];
+    updatedQuestions[qIndex].answerType = value;
+    updatedQuestions[qIndex].correctAnswers = [];
+    setFormData({ ...formData, quizQuestions: updatedQuestions });
+  };
 
-const handleAnswerTypeChange = (qIndex: number, value: 'single' | 'multiple') => {
-  const updatedQuestions = [...(formData.quizQuestions || [])];
-  updatedQuestions[qIndex].answerType = value;
-  updatedQuestions[qIndex].correctAnswers = [];
-  setFormData({ ...formData, quizQuestions: updatedQuestions });
-};
+  const handleCorrectAnswerChange = (qIndex: number, optIndex: number) => {
+    const updatedQuestions = [...(formData.quizQuestions || [])];
+    const question = updatedQuestions[qIndex];
 
-const handleCorrectAnswerChange = (qIndex: number, optIndex: number) => {
-  const updatedQuestions = [...(formData.quizQuestions || [])];
-  const question = updatedQuestions[qIndex];
-
-  if (question.answerType === 'single') {
-    question.correctAnswers = [optIndex];
-  } else {
-    if (question.correctAnswers.includes(optIndex)) {
-      question.correctAnswers = question.correctAnswers.filter((i) => i !== optIndex);
+    if (question.answerType === 'single') {
+      question.correctAnswers = [optIndex];
     } else {
-      question.correctAnswers.push(optIndex);
+      if (question.correctAnswers.includes(optIndex)) {
+        question.correctAnswers = question.correctAnswers.filter((i) => i !== optIndex);
+      } else {
+        question.correctAnswers.push(optIndex);
+      }
     }
-  }
 
-  setFormData({ ...formData, quizQuestions: updatedQuestions });
-};
+    setFormData({ ...formData, quizQuestions: updatedQuestions });
+  };
 
- const handlePointsChange = (qIndex: number, value: number) => {
-  const updatedQuestions = [...(formData.quizQuestions || [])];
-  updatedQuestions[qIndex].points = value < 0 ? 0 : value;
-  setFormData({ ...formData, quizQuestions: updatedQuestions });
-};
+  const handlePointsChange = (qIndex: number, value: number) => {
+    const updatedQuestions = [...(formData.quizQuestions || [])];
+    updatedQuestions[qIndex].points = value < 0 ? 0 : value;
+    setFormData({ ...formData, quizQuestions: updatedQuestions });
+  };
 
-const handleNegativePointsChange = (qIndex: number, value: number) => {
-  const updatedQuestions = [...(formData.quizQuestions || [])];
-  updatedQuestions[qIndex].negativePoints = value; // ✅ negative allow
-  setFormData({ ...formData, quizQuestions: updatedQuestions });
-};
+  const handleNegativePointsChange = (qIndex: number, value: number) => {
+    const updatedQuestions = [...(formData.quizQuestions || [])];
+    updatedQuestions[qIndex].negativePoints = value;
+    setFormData({ ...formData, quizQuestions: updatedQuestions });
+  };
 
-const handleBonusChange = (qIndex: number, checked: boolean) => {
-  const updatedQuestions = [...(formData.quizQuestions || [])];
-  updatedQuestions[qIndex].isBonus = checked;
-  setFormData({ ...formData, quizQuestions: updatedQuestions });
-};
-
+  const handleBonusChange = (qIndex: number, checked: boolean) => {
+    const updatedQuestions = [...(formData.quizQuestions || [])];
+    updatedQuestions[qIndex].isBonus = checked;
+    setFormData({ ...formData, quizQuestions: updatedQuestions });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
     const convertToEmbedUrl = (url: string) => {
-  if (!url) return '';
-
-  if (url.includes('youtube.com/embed/')) return url;
-
-  const watchMatch = url.match(/[?&]v=([^&]+)/);
-  if (watchMatch?.[1]) {
-    return `https://www.youtube.com/embed/${watchMatch[1]}`;
-  }
-
-  const shortMatch = url.match(/youtu\.be\/([^?&]+)/);
-  if (shortMatch?.[1]) {
-    return `https://www.youtube.com/embed/${shortMatch[1]}`;
-  }
-
-  return url;
-};
+      if (!url) return '';
+      if (url.includes('youtube.com/embed/')) return url;
+      const watchMatch = url.match(/[?&]v=([^&]+)/);
+      if (watchMatch?.[1]) return `https://www.youtube.com/embed/${watchMatch[1]}`;
+      const shortMatch = url.match(/youtu\.be\/([^?&]+)/);
+      if (shortMatch?.[1]) return `https://www.youtube.com/embed/${shortMatch[1]}`;
+      return url;
+    };
 
     try {
-      // ✅ Filter empty strings from all three arrays
       const filteredMedicinalUse = formData.medicinalUse.filter(item => item.trim() !== '');
       const filteredResearchPapers = formData.researchPapers.filter(item => item.trim() !== '');
       const filteredCategory = formData.category.filter(item => item.trim() !== '');
 
-      // ✅ QUIZ CLEANING
-const cleanedQuizQuestions = (formData.quizQuestions || [])
-  .map((q) => ({
-    ...q,
-    question: q.question.trim(),
-    options: q.options.map((opt) => opt.trim()),
-    correctAnswers: q.correctAnswers,
-    points: Number(q.points) || 0,
-    negativePoints: Number(q.negativePoints) || 0,
-    isBonus: Boolean(q.isBonus),
-  }))
-  .filter((q) => q.question !== '');
+      const cleanedQuizQuestions = (formData.quizQuestions || [])
+        .map((q) => ({
+          ...q,
+          question: q.question.trim(),
+          options: q.options.map((opt) => opt.trim()),
+          correctAnswers: q.correctAnswers,
+          points: Number(q.points) || 0,
+          negativePoints: Number(q.negativePoints) || 0,
+          isBonus: Boolean(q.isBonus),
+        }))
+        .filter((q) => q.question !== '');
 
-// ✅ VALIDATION
-
-for (const q of cleanedQuizQuestions) {
-  if (q.options.some((opt) => opt === '')) {
-    alert('Har question ke 4 options bharna zaroori hai.');
-    setIsSubmitting(false);
-    return;
-  }
-
-  if (q.correctAnswers.length === 0) {
-    alert('Har question ka kam se kam ek correct answer select karo.');
-    setIsSubmitting(false);
-    return;
-  }
-
-  if (q.answerType === 'single' && q.correctAnswers.length > 1) {
-    alert('Single answer type me sirf ek correct answer allowed hai.');
-    setIsSubmitting(false);
-    return;
-  }
-
-  if (q.points < 0) {
-    alert('Points negative nahi ho sakte.');
-    setIsSubmitting(false);
-    return;
-  }
-
-  if (q.negativePoints > 0) {
-    alert('Wrong answer ke liye negative points negative hone chahiye (e.g. -1).');
-    setIsSubmitting(false);
-    return;
-  }
-}
+      for (const q of cleanedQuizQuestions) {
+        if (q.options.some((opt) => opt === '')) {
+          alert('Har question ke 4 options bharna zaroori hai.');
+          setIsSubmitting(false);
+          return;
+        }
+        if (q.correctAnswers.length === 0) {
+          alert('Har question ka kam se kam ek correct answer select karo.');
+          setIsSubmitting(false);
+          return;
+        }
+        if (q.answerType === 'single' && q.correctAnswers.length > 1) {
+          alert('Single answer type me sirf ek correct answer allowed hai.');
+          setIsSubmitting(false);
+          return;
+        }
+        if (q.points < 0) {
+          alert('Points negative nahi ho sakte.');
+          setIsSubmitting(false);
+          return;
+        }
+        if (q.negativePoints > 0) {
+          alert('Wrong answer ke liye negative points negative hone chahiye (e.g. -1).');
+          setIsSubmitting(false);
+          return;
+        }
+      }
 
       const plantData = {
         ...formData,
-        youtubeEmbedUrl: formData.youtubeEmbedUrl?.trim() || '',
+        youtubeEmbedUrl: convertToEmbedUrl(formData.youtubeEmbedUrl?.trim() || ''),
+        modelUrl: formData.modelUrl?.trim() || '',   // ✅ NEW: store modelUrl
         medicinalUse: filteredMedicinalUse,
         researchPapers: filteredResearchPapers,
-        category: filteredCategory,   // ✅ Store as array in Firestore
+        category: filteredCategory,
         quizQuestions: cleanedQuizQuestions,
         updatedAt: serverTimestamp(),
       };
@@ -464,7 +445,12 @@ for (const q of cleanedQuizQuestions) {
                     <span className="px-3 py-1 bg-[oklch(95%_0.01_160)] rounded-full text-[10px] uppercase tracking-widest font-bold flex items-center gap-1.5">
                       <FileText size={10} /> {plant.researchPapers?.length || 0} Papers
                     </span>
-                    {/* ✅ Show all categories as individual badges */}
+                    {/* ✅ Show 3D model badge if modelUrl exists */}
+                    {plant.modelUrl && (
+                      <span className="px-3 py-1 bg-[oklch(92%_0.04_260)] text-[oklch(30%_0.08_260)] rounded-full text-[10px] uppercase tracking-widest font-bold flex items-center gap-1.5">
+                        <Box size={10} /> 3D Model
+                      </span>
+                    )}
                     {Array.isArray(plant.category) && plant.category.map((cat, i) => (
                       <span
                         key={i}
@@ -556,7 +542,7 @@ for (const q of cleanedQuizQuestions) {
                   </div>
                 </div>
 
-                {/* ✅ Category (Dynamic Array) — same pattern as medicinalUse */}
+                {/* Category (Dynamic Array) */}
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <label className="text-[10px] uppercase tracking-widest font-bold opacity-50 flex items-center gap-2">
@@ -734,18 +720,38 @@ for (const q of cleanedQuizQuestions) {
                     placeholder="https://images.unsplash.com/..."
                   />
                 </div>
-                 <div className="space-y-2">
-  <label className="text-[10px] uppercase tracking-widest font-bold opacity-50">
-    YouTube Embedded URL
-  </label>
-  <input
-    name="youtubeEmbedUrl"
-    value={formData.youtubeEmbedUrl || ''}
-    onChange={handleInputChange}
-    className="w-full px-4 py-3 bg-[oklch(98%_0.01_160)] border border-[oklch(90%_0.01_160)] rounded-xl focus:ring-2 ring-[oklch(35%_0.05_150/0.2)] outline-none transition-all"
-    placeholder="https://www.youtube.com/embed/VIDEO_ID"
-  />
-</div>
+
+                {/* YouTube Embed URL */}
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest font-bold opacity-50">
+                    YouTube Embedded URL
+                  </label>
+                  <input
+                    name="youtubeEmbedUrl"
+                    value={formData.youtubeEmbedUrl || ''}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 bg-[oklch(98%_0.01_160)] border border-[oklch(90%_0.01_160)] rounded-xl focus:ring-2 ring-[oklch(35%_0.05_150/0.2)] outline-none transition-all"
+                    placeholder="https://www.youtube.com/embed/VIDEO_ID"
+                  />
+                </div>
+
+                {/* ✅ NEW: 3D Model URL */}
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest font-bold opacity-50 flex items-center gap-2">
+                    <Box size={12} /> 3D Model URL
+                  </label>
+                  <input
+                    name="modelUrl"
+                    value={formData.modelUrl || ''}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 bg-[oklch(95%_0.03_260)] border border-[oklch(85%_0.05_260)] rounded-xl focus:ring-2 ring-[oklch(50%_0.1_260/0.3)] outline-none transition-all"
+                    placeholder="https://example.com/model.glb or .gltf URL"
+                  />
+                  <p className="text-[10px] text-[oklch(50%_0.01_160)] mt-1">
+                    Supports .glb, .gltf, or any hosted 3D model URL
+                  </p>
+                </div>
+
                 {/* Medicinal Use (array) */}
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
@@ -820,130 +826,129 @@ for (const q of cleanedQuizQuestions) {
                   </div>
                 </div>
 
+                {/* Quiz / Gamification */}
                 <div className="space-y-6">
-  <div className="flex items-center justify-between">
-    <label className="text-[10px] uppercase tracking-widest font-bold opacity-50">
-      Plant Quiz / Gamification
-    </label>
-    <button
-      type="button"
-      onClick={addQuestion}
-      className="text-xs font-bold text-[oklch(35%_0.05_150)] flex items-center gap-1 hover:opacity-70"
-    >
-      <PlusCircle size={14} /> Add Question
-    </button>
-  </div>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] uppercase tracking-widest font-bold opacity-50">
+                      Plant Quiz / Gamification
+                    </label>
+                    <button
+                      type="button"
+                      onClick={addQuestion}
+                      className="text-xs font-bold text-[oklch(35%_0.05_150)] flex items-center gap-1 hover:opacity-70"
+                    >
+                      <PlusCircle size={14} /> Add Question
+                    </button>
+                  </div>
 
-  {(formData.quizQuestions || []).map((q, qIndex) => (
-    <div key={qIndex} className="border rounded-2xl p-5 space-y-4 bg-[oklch(98%_0.01_160)]">
+                  {(formData.quizQuestions || []).map((q, qIndex) => (
+                    <div key={qIndex} className="border rounded-2xl p-5 space-y-4 bg-[oklch(98%_0.01_160)]">
 
-  {/* Header */}
-  <div className="flex items-center justify-between">
-    <h3 className="font-semibold">Question {qIndex + 1}</h3>
-    {(formData.quizQuestions || []).length > 1 && (
-      <button
-        type="button"
-        onClick={() => removeQuestion(qIndex)}
-        className="p-2 text-red-500 hover:bg-red-50 rounded-xl"
-      >
-        <Trash2 size={16} />
-      </button>
-    )}
-  </div>
+                      {/* Header */}
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-semibold">Question {qIndex + 1}</h3>
+                        {(formData.quizQuestions || []).length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeQuestion(qIndex)}
+                            className="p-2 text-red-500 hover:bg-red-50 rounded-xl"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
+                      </div>
 
-  {/* Question */}
-  <input
-    value={q.question}
-    onChange={(e) => handleQuestionChange(qIndex, e.target.value)}
-    placeholder="Enter question"
-    className="w-full px-4 py-3 border rounded-xl"
-  />
+                      {/* Question */}
+                      <input
+                        value={q.question}
+                        onChange={(e) => handleQuestionChange(qIndex, e.target.value)}
+                        placeholder="Enter question"
+                        className="w-full px-4 py-3 border rounded-xl"
+                      />
 
-  {/* Answer Type */}
-  <div className="space-y-2">
-    <label className="text-sm font-medium">Answer Type</label>
-    <select
-      value={q.answerType}
-      onChange={(e) =>
-        handleAnswerTypeChange(qIndex, e.target.value as 'single' | 'multiple')
-      }
-      className="w-full px-4 py-3 border rounded-xl"
-    >
-      <option value="single">Single Correct Answer (Radio)</option>
-      <option value="multiple">Multiple Correct Answers (Checkbox)</option>
-    </select>
-  </div>
+                      {/* Answer Type */}
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Answer Type</label>
+                        <select
+                          value={q.answerType}
+                          onChange={(e) =>
+                            handleAnswerTypeChange(qIndex, e.target.value as 'single' | 'multiple')
+                          }
+                          className="w-full px-4 py-3 border rounded-xl"
+                        >
+                          <option value="single">Single Correct Answer (Radio)</option>
+                          <option value="multiple">Multiple Correct Answers (Checkbox)</option>
+                        </select>
+                      </div>
 
-  {/* ✅ Points + Bonus */}
-  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-    <div className="space-y-2">
-      <label className="text-sm font-medium">Right Answer Points</label>
-      <input
-        type="number"
-        min="0"
-        value={q.points ?? 0}
-        onChange={(e) => handlePointsChange(qIndex, Number(e.target.value))}
-        className="w-full px-4 py-3 border rounded-xl"
-      />
-    </div>
+                      {/* Points + Bonus */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Right Answer Points</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={q.points ?? 0}
+                            onChange={(e) => handlePointsChange(qIndex, Number(e.target.value))}
+                            className="w-full px-4 py-3 border rounded-xl"
+                          />
+                        </div>
 
-    <div className="space-y-2">
-      <label className="text-sm font-medium">Wrong Answer Negative Points</label>
-     <input
-  type="number"
-  value={q.negativePoints ?? 0}
-  onChange={(e) => handleNegativePointsChange(qIndex, Number(e.target.value))}
-  className="w-full px-4 py-3 border rounded-xl"
-  placeholder="e.g. -1"
-/>
-    </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Wrong Answer Negative Points</label>
+                          <input
+                            type="number"
+                            value={q.negativePoints ?? 0}
+                            onChange={(e) => handleNegativePointsChange(qIndex, Number(e.target.value))}
+                            className="w-full px-4 py-3 border rounded-xl"
+                            placeholder="e.g. -1"
+                          />
+                        </div>
 
-    <div className="space-y-2 flex flex-col justify-end">
-      <label className="text-sm font-medium">Bonus Question</label>
-      <label className="flex items-center gap-2 px-4 py-3 border rounded-xl cursor-pointer">
-        <input
-          type="checkbox"
-          checked={q.isBonus || false}
-          onChange={(e) => handleBonusChange(qIndex, e.target.checked)}
-        />
-        <span>Mark as Bonus</span>
-      </label>
-    </div>
-  </div>
+                        <div className="space-y-2 flex flex-col justify-end">
+                          <label className="text-sm font-medium">Bonus Question</label>
+                          <label className="flex items-center gap-2 px-4 py-3 border rounded-xl cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={q.isBonus || false}
+                              onChange={(e) => handleBonusChange(qIndex, e.target.checked)}
+                            />
+                            <span>Mark as Bonus</span>
+                          </label>
+                        </div>
+                      </div>
 
-  {/* Options */}
-  <div className="space-y-3">
-    {q.options.map((option, optIndex) => (
-      <div key={optIndex} className="flex items-center gap-3">
+                      {/* Options */}
+                      <div className="space-y-3">
+                        {q.options.map((option, optIndex) => (
+                          <div key={optIndex} className="flex items-center gap-3">
+                            {q.answerType === 'single' ? (
+                              <input
+                                type="radio"
+                                name={`correct-answer-${qIndex}`}
+                                checked={q.correctAnswers.includes(optIndex)}
+                                onChange={() => handleCorrectAnswerChange(qIndex, optIndex)}
+                              />
+                            ) : (
+                              <input
+                                type="checkbox"
+                                checked={q.correctAnswers.includes(optIndex)}
+                                onChange={() => handleCorrectAnswerChange(qIndex, optIndex)}
+                              />
+                            )}
+                            <input
+                              value={option}
+                              onChange={(e) => handleOptionChange(qIndex, optIndex, e.target.value)}
+                              placeholder={`Option ${optIndex + 1}`}
+                              className="flex-1 px-4 py-3 border rounded-xl"
+                            />
+                          </div>
+                        ))}
+                      </div>
 
-        {q.answerType === 'single' ? (
-          <input
-            type="radio"
-            name={`correct-answer-${qIndex}`}
-            checked={q.correctAnswers.includes(optIndex)}
-            onChange={() => handleCorrectAnswerChange(qIndex, optIndex)}
-          />
-        ) : (
-          <input
-            type="checkbox"
-            checked={q.correctAnswers.includes(optIndex)}
-            onChange={() => handleCorrectAnswerChange(qIndex, optIndex)}
-          />
-        )}
-
-        <input
-          value={option}
-          onChange={(e) => handleOptionChange(qIndex, optIndex, e.target.value)}
-          placeholder={`Option ${optIndex + 1}`}
-          className="flex-1 px-4 py-3 border rounded-xl"
-        />
-      </div>
-    ))}
-  </div>
-
-</div>
-  ))}
-</div>
+                    </div>
+                  ))}
+                </div>
 
                 {/* Submit Buttons */}
                 <div className="pt-6 flex gap-4">

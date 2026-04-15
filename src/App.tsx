@@ -11,7 +11,7 @@ import PlantDetail from "./components/PlantsPortal/Un Used Componets/PlantDetail
 import VirtualTour from "./pages/VirtualTour";
 import Signup from "./pages/Signup";
 import Login from "./pages/Login";
-import Profile from "./components/PlantsPortal/Profile";
+import Profile from "./components/PlantsPortal/ExploreGarden/Profile";
 import PlantDetails from "./components/PlantsPortal/PlantDetails/PlantDetails";
 import GlobalMusicPlayer from "./components/GlobalMusicPlayer";
 
