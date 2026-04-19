@@ -3,7 +3,7 @@
 ![React](https://img.shields.io/badge/Frontend-React-blue?style=for-the-badge\&logo=react)
 ![TypeScript](https://img.shields.io/badge/Language-TypeScript-blue?style=for-the-badge\&logo=typescript)
 ![Firebase](https://img.shields.io/badge/Backend-Firebase-orange?style=for-the-badge\&logo=firebase)
-![Three JS](https://img.shields.io/badge/3D%20Models-Cloudinary-blueviolet?style=for-the-badge\&logo=cloudinary)
+![Three JS](https://img.shields.io/badge/3D%20Models-Three.js-blue?style=for-the-badge&logo=three.js)
 ![Vite](https://img.shields.io/badge/Build-Vite-purple?style=for-the-badge\&logo=vite)
 ![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 
