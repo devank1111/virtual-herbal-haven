@@ -23,3 +23,21 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Python Deep Learning
+dl/.venv/
+dl/__pycache__/
+dl/tests/__pycache__/
+*.pyc
+
+# Plant Dataset
+dl/dataset/
+dl/processed_dataset/
+
+# Trained Models
+dl/models/
+*.keras
+*.h5
+
+# macOS
+.DS_Store
