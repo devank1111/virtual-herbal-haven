@@ -24,20 +24,69 @@ dist-ssr
 *.sln
 *.sw?
 
-# Python Deep Learning
+
+# ==============================
+# Deep Learning - Python
+# ==============================
+
+# Virtual environment
 dl/.venv/
-dl/__pycache__/
-dl/tests/__pycache__/
-*.pyc
+dl/venv/
 
-# Plant Dataset
+# Python cache
+__pycache__/
+*.py[cod]
+
+# ==============================
+# Datasets
+# ==============================
+
+# Original Kaggle dataset
 dl/dataset/
-dl/processed_dataset/
+dl/dataset_backup/
+dl/dataset_combined/
+dl/dataset_clean/
 
-# Trained Models
-dl/models/
-*.keras
-*.h5
+# Processed datasets
+dl/processed_dataset/
+dl/processed_dataset_old/
+dl/processed_dataset_combined/
+dl/processed_dataset_v2/
+
+# ==============================
+# Trained Models & Results
+# ==============================
+
+dl/artifacts/
+dl/artifacts_before_grouped/
+dl/artifacts_v2/
+
+# ==============================
+# Temporary Testing Images
+# ==============================
+
+dl/tests/sample_images/
+dl/tests/neem_duplicate_comparison.jpg
+dl/tests/neem_full_contact_sheet.jpg
+dl/tests/amruta_balli_contact_sheet.jpg
+dl/tests/amruta_errors.jpg
+dl/tests/neem_contact_sheet.jpg
+
+# ==============================
+# macOS
+# ==============================
+
+.DS_Store
+dl/archive/
+
+# ==============================
+# Environment Variables
+# ==============================
+
+.env
+.env.*
+!.env.example
+
 
 # macOS
 .DS_Store

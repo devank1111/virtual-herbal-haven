@@ -1,67 +1,156 @@
 
 from pathlib import Path
-from sklearn.model_selection import train_test_split
+from PIL import Image
+import numpy as np
+import random
 import shutil
 
-SOURCE = Path("dataset/Medicinal plant dataset")
-DESTINATION = Path("processed_dataset")
+ROOT = Path(__file__).resolve().parent
+SOURCE = ROOT / "dataset_clean"
+DEST = ROOT / "processed_dataset_v2"
 
 SEED = 42
+THRESHOLD = 4
+EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 
-if DESTINATION.exists():
+random.seed(SEED)
+
+if DEST.exists():
     raise FileExistsError(
-        "processed_dataset already exists. "
-        "Check it before running again."
+        f"{DEST} already exists. Inspect it before running again."
     )
 
-for plant_folder in sorted(SOURCE.iterdir()):
 
+def image_hash(path):
+    with Image.open(path) as img:
+        img = img.convert("L").resize((16, 16))
+        pixels = np.asarray(img, dtype=np.float32)
+
+    bits = pixels > pixels.mean()
+    return np.packbits(bits.flatten())
+
+
+def make_groups(images):
+    hashes = [image_hash(path) for path in images]
+    parent = list(range(len(images)))
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(a, b):
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[rb] = ra
+
+    for i in range(len(images)):
+        for j in range(i + 1, len(images)):
+            distance = int(
+                np.unpackbits(
+                    np.bitwise_xor(hashes[i], hashes[j])
+                ).sum()
+            )
+
+            if distance <= THRESHOLD:
+                union(i, j)
+
+    groups = {}
+
+    for i, path in enumerate(images):
+        groups.setdefault(find(i), []).append(path)
+
+    return list(groups.values())
+
+
+def split_groups(groups):
+    rng = random.Random(SEED)
+    rng.shuffle(groups)
+    groups.sort(key=len, reverse=True)
+
+    total = sum(len(group) for group in groups)
+
+    targets = {
+        "train": total * 0.70,
+        "val": total * 0.15,
+        "test": total * 0.15,
+    }
+
+    result = {split: [] for split in targets}
+    counts = {split: 0 for split in targets}
+
+    for group in groups:
+        split = max(
+            targets,
+            key=lambda s: (
+                targets[s] - counts[s]
+            ) / targets[s]
+        )
+
+        result[split].extend(group)
+        counts[split] += len(group)
+
+    return result
+
+
+
+for plant_folder in sorted(SOURCE.iterdir()):
+    
     if not plant_folder.is_dir():
         continue
 
-    images = sorted([
-        p for p in plant_folder.iterdir()
-        if p.suffix.lower() in
-        {".jpg", ".jpeg", ".png", ".webp"}
-    ])
-
-    train_images, temp_images = train_test_split(
-        images,
-        test_size=0.30,
-        random_state=SEED
+    images = sorted(
+        path for path in plant_folder.iterdir()
+        if path.is_file()
+        and path.suffix.lower() in EXTENSIONS
     )
 
-    val_images, test_images = train_test_split(
-        temp_images,
-        test_size=0.50,
-        random_state=SEED
-    )
+    natural_images = [
+        path for path in images
+        if path.name.lower().startswith("natural")
+    ]
 
-    for split_name, split_images in [
-        ("train", train_images),
-        ("val", val_images),
-        ("test", test_images)
-    ]:
-        output_folder = (
-            DESTINATION / split_name / plant_folder.name
+    original_images = [
+        path for path in images
+        if not path.name.lower().startswith("natural")
+    ]
+
+    # Group visually similar images
+    original_groups = make_groups(original_images)
+    natural_groups = make_groups(natural_images)
+
+    # Split both sources separately
+    original_splits = split_groups(original_groups)
+    natural_splits = split_groups(natural_groups)
+
+    for split in ["train", "val", "test"]:
+        output_folder = DEST / split / plant_folder.name
+        output_folder.mkdir(parents=True, exist_ok=True)
+
+        files = (
+            original_splits[split]
+            + natural_splits[split]
         )
 
-        output_folder.mkdir(
-            parents=True,
-            exist_ok=True
+        for path in files:
+            shutil.copy2(path, output_folder / path.name)
+
+    print(f"\n{plant_folder.name}")
+    print(f"Total images: {len(images)}")
+    print(f"Natural images: {len(natural_images)}")
+
+    for split in ["train", "val", "test"]:
+        total = (
+            len(original_splits[split])
+            + len(natural_splits[split])
+        )
+        natural = len(natural_splits[split])
+
+        print(
+            f"{split}: {total} images "
+            f"({natural} natural)"
         )
 
-        for image in split_images:
-            shutil.copy2(
-                image,
-                output_folder / image.name
-            )
+print("\nDataset v2 splitting completed!")
 
-    print(
-        f"{plant_folder.name}: "
-        f"Train={len(train_images)}, "
-        f"Val={len(val_images)}, "
-        f"Test={len(test_images)}"
-    )
-
-print("\nDataset splitting completed!")

@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Leaf, Menu, X, LogOut, User, Map, ChevronDown } from "lucide-react";
+import { Leaf, Menu, X, LogOut, User, Map, ChevronDown, ScanLine } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
@@ -59,6 +59,19 @@ export default function Header() {
               {item.label}
             </Link>
           ))}
+
+<Link
+  to="/scan"
+  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+    location.pathname === "/scan"
+      ? "bg-primary text-primary-foreground"
+      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+  }`}
+>
+  <ScanLine className="w-4 h-4" />
+  Scan Plant
+</Link>
+
           {user ? (
   <div className="relative">
     <button
@@ -152,6 +165,20 @@ export default function Header() {
             className="md:hidden overflow-hidden bg-background border-b border-border"
           >
             <nav className="flex flex-col p-4 gap-1">
+
+<Link
+  to="/scan"
+  onClick={() => setMobileOpen(false)}
+  className={`flex items-center gap-2 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+    location.pathname === "/scan"
+      ? "bg-primary text-primary-foreground"
+      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+  }`}
+>
+  <ScanLine className="w-5 h-5" />
+  Scan Plant
+</Link>
+
               {navItems.map((item) => (
                 <Link
                   key={item.path}

@@ -7,13 +7,14 @@ import { AuthProvider } from "@/hooks/useAuth";
 import ProtectedRoute from "@/components/ProtectedRoute/ProtectedRoute";
 import Index from "./pages/Index";
 import Garden from "./components/PlantsPortal/ExploreGarden/Garden";
-import PlantDetail from "./components/PlantsPortal/Un Used Componets/PlantDetail";
+// import PlantDetail from "./components/PlantsPortal/Un Used Componets/PlantDetail";
 import VirtualTour from "./pages/VirtualTour";
 import Signup from "./pages/Signup";
 import Login from "./pages/Login";
 import Profile from "./components/PlantsPortal/ExploreGarden/Profile";
 import PlantDetails from "./components/PlantsPortal/PlantDetails/PlantDetails";
 import GlobalMusicPlayer from "./components/GlobalMusicPlayer";
+import ScanPlant from "./pages/ScanPlant";
 
 // Admin panel
 import AdminDashboard from "./pages/adminPanel/dashboard";
@@ -29,7 +30,11 @@ const App = () => (
       <AuthProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter>
+        <BrowserRouter 
+          future={{
+          v7_startTransition: true,
+          }}
+        >
           <GlobalMusicPlayer />
 
           <Routes>
@@ -62,6 +67,8 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+
+            <Route path="/scan" element={<ScanPlant />} />
 
             {/* Admin Panel */}
             <Route
