@@ -1,0 +1,7 @@
+Plant,Precision (%),Recall (%),F1-Score (%),Support
+Aloe_Vera,100.0,100.0,100.0,38
+Neem,99.17,100.0,99.59,120
+Tulsi,100.0,98.39,99.19,62
+
+Overall Accuracy (%),99.55
+Test Loss,0.0231

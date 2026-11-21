@@ -1,6 +1,6 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Leaf, Menu, X, LogOut, User, Map, ChevronDown, ScanLine } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -11,6 +11,20 @@ export default function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { user, signOut } = useAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+
+const handleSelectedPhoto = (file?: File) => {
+  if (!file) return;
+
+  setMobileOpen(false);
+
+  navigate("/scan", {
+    state: {
+      selectedPhoto: file,
+    },
+  });
+};
 
   const handleLogout = async () => {
   await signOut();
@@ -31,7 +45,29 @@ export default function Header() {
       ];
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border" >
+      <input
+  ref={cameraInputRef}
+  type="file"
+  accept="image/*"
+  capture="environment"
+  className="hidden"
+  onChange={(e) => {
+    handleSelectedPhoto(e.target.files?.[0]);
+    e.target.value = "";
+  }}
+/>
+
+<input
+  ref={galleryInputRef}
+  type="file"
+  accept="image/*"
+  className="hidden"
+  onChange={(e) => {
+    handleSelectedPhoto(e.target.files?.[0]);
+    e.target.value = "";
+  }}
+/>
       <div className="container mx-auto flex items-center justify-between h-16 px-4">
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2 group">
@@ -60,17 +96,24 @@ export default function Header() {
             </Link>
           ))}
 
-<Link
-  to="/scan"
-  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-    location.pathname === "/scan"
-      ? "bg-primary text-primary-foreground"
-      : "text-muted-foreground hover:text-foreground hover:bg-muted"
-  }`}
->
-  <ScanLine className="w-4 h-4" />
-  Scan Plant
-</Link>
+<div className="relative group">
+  <button
+    type="button"
+    onClick={() => cameraInputRef.current?.click()}
+    className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+  >
+    <ScanLine className="w-4 h-4" />
+    Scan Plant
+  </button>
+
+  <button
+    type="button"
+    onClick={() => galleryInputRef.current?.click()}
+    className="absolute top-full left-0 mt-1 px-3 py-2 rounded-lg bg-background border border-border shadow-md text-sm hidden group-hover:block whitespace-nowrap"
+  >
+    Choose from Gallery
+  </button>
+</div>
 
           {user ? (
   <div className="relative">
@@ -166,18 +209,24 @@ export default function Header() {
           >
             <nav className="flex flex-col p-4 gap-1">
 
-<Link
-  to="/scan"
-  onClick={() => setMobileOpen(false)}
-  className={`flex items-center gap-2 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-    location.pathname === "/scan"
-      ? "bg-primary text-primary-foreground"
-      : "text-muted-foreground hover:text-foreground hover:bg-muted"
-  }`}
->
-  <ScanLine className="w-5 h-5" />
-  Scan Plant
-</Link>
+<div className="space-y-2">
+  <button
+    type="button"
+    onClick={() => cameraInputRef.current?.click()}
+    className="w-full flex items-center gap-2 px-4 py-3 rounded-lg text-sm font-medium text-foreground hover:bg-muted"
+  >
+    <ScanLine className="w-5 h-5" />
+    Scan Plant — Open Camera
+  </button>
+
+  <button
+    type="button"
+    onClick={() => galleryInputRef.current?.click()}
+    className="w-full flex items-center gap-2 px-4 py-3 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted"
+  >
+    Choose from Gallery
+  </button>
+</div>
 
               {navItems.map((item) => (
                 <Link
